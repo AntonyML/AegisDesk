@@ -3,7 +3,7 @@ import {
   addCalendarMonths,
   chooseDurationMonths,
   evaluate,
-} from "../src/cycles";
+} from "../src/backend/domain/cycles";
 
 const cycle = {
   id: "cycle-1",

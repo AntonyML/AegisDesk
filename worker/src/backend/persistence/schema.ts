@@ -136,3 +136,7 @@ export const schema = {
   events,
   tickets,
 };
+
+export type InstallationRecord = typeof installations.$inferSelect;
+export type EventRecord = typeof events.$inferSelect;
+export type TicketRecord = typeof tickets.$inferSelect;

@@ -1,7 +1,14 @@
 # AegisDesk Worker
 
 Worker de Cloudflare en TypeScript. El panel administrativo se sirve desde el
-mismo Worker y queda protegido por Cloudflare Access; no hay frontend separado.
+mismo Worker y queda protegido por Cloudflare Access. El código está separado
+en `src/backend` (rutas, servicios, persistencia y seguridad) y `src/frontend`
+(páginas, estilos, scripts y modelos de vista).
+
+`src/index.ts` solo compone la aplicación y el cron. Las reglas de dominio se
+encapsulan en clases como `CyclePolicy`, `EnrollmentService`, `ShellService`,
+`AdminService` y `TicketService`; los adaptadores D1 viven en repositorios
+dedicados.
 
 ## Desarrollo local
 

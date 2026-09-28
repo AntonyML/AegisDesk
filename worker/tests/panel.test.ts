@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { panelPage } from "../src/panel";
+import { panelPage } from "../src/frontend/panel/page";
 
 describe("panel page", () => {
   it("embeds an executable ticket status script", async () => {

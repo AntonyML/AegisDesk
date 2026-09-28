@@ -54,3 +54,10 @@ export const ticketPatchSchema = z.object({
   status: z.enum(["open", "in_progress", "resolved", "spam"]).optional(),
   note: z.string().trim().max(1000).optional(),
 });
+
+export type EnrollmentInput = z.infer<typeof enrollmentSchema>;
+export type StateInput = z.infer<typeof stateSchema>;
+export type EventInput = z.infer<typeof eventSchema>;
+export type TicketInput = z.infer<typeof ticketSchema>;
+export type CyclePatchInput = z.infer<typeof cyclePatchSchema>;
+export type TicketPatchInput = z.infer<typeof ticketPatchSchema>;
