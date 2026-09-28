@@ -3,7 +3,7 @@
 #ifndef MyAppVersion
   #define MyAppVersion "0.1.0"
 #endif
-#define MyAppPublisher "Soporte SIDC"
+#define MyAppPublisher "Soporte Aegis"
 #define MyAppURL "https://aegisdesk.example.invalid"
 #define MyAppExeName "AegisDesk.exe"
 
