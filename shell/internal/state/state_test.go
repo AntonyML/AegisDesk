@@ -3,6 +3,7 @@ package state
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
@@ -97,5 +98,43 @@ func TestParsePublicKeyPEM(t *testing.T) {
 	parsed, err := ParsePublicKeyPEM(string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der})))
 	if err != nil || !parsed.Equal(publicKey) {
 		t.Fatalf("public key parse failed: %v", err)
+	}
+}
+
+func TestEmbeddedVerifierUsesBase64PublicKey(t *testing.T) {
+	publicKey, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, err := x509Marshal(publicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	previousBase64 := EmbeddedPublicKeyBase64
+	previousPEM := EmbeddedPublicKeyPEM
+	previousKeyID := EmbeddedPublicKeyID
+	previousIssuer := EmbeddedIssuer
+	t.Cleanup(func() {
+		EmbeddedPublicKeyBase64 = previousBase64
+		EmbeddedPublicKeyPEM = previousPEM
+		EmbeddedPublicKeyID = previousKeyID
+		EmbeddedIssuer = previousIssuer
+	})
+
+	EmbeddedPublicKeyBase64 = base64.StdEncoding.EncodeToString(der)
+	EmbeddedPublicKeyPEM = ""
+	EmbeddedPublicKeyID = "test-key"
+	EmbeddedIssuer = "https://worker.test"
+
+	verifier, err := EmbeddedVerifier()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verifier.Issuer != EmbeddedIssuer {
+		t.Fatalf("issuer mismatch: %q", verifier.Issuer)
+	}
+	if !verifier.Keys[EmbeddedPublicKeyID].Equal(publicKey) {
+		t.Fatal("embedded public key was not loaded")
 	}
 }

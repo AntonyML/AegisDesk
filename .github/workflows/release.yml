@@ -92,12 +92,21 @@ jobs:
       - name: 📦 Compilar Binario y Empaquetar Instalador con Inno Setup
         shell: pwsh
         working-directory: shell
+        env:
+          AEGISDESK_STATE_PUBLIC_KEY_BASE64: ${{ vars.AEGISDESK_STATE_PUBLIC_KEY_BASE64 }}
         run: |
           $ver = "${{ steps.semver.outputs.version }}"
+          $publicKey = $env:AEGISDESK_STATE_PUBLIC_KEY_BASE64
+          if ([string]::IsNullOrWhiteSpace($publicKey)) {
+            throw "Falta la variable de repositorio AEGISDESK_STATE_PUBLIC_KEY_BASE64. No se permite publicar un shell sin verificador Ed25519."
+          }
+          $publicKey = $publicKey.Trim()
           Write-Host "Compilando AegisDesk Shell versión $ver..."
           $buildArgs = @{
             Version = $ver
             Installer = $true
+            PublicKeyBase64 = $publicKey
+            RequireVerifier = $true
           }
           if ("${{ vars.AEGISDESK_WORKER_BASE_URL }}") {
             $buildArgs["WorkerBaseURL"] = "${{ vars.AEGISDESK_WORKER_BASE_URL }}"
