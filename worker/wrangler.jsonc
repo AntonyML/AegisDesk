@@ -11,8 +11,8 @@
   },
   "vars": {
     "ENVIRONMENT": "production",
-    "ACCESS_TEAM_DOMAIN": "https://example.cloudflareaccess.com",
-    "ACCESS_AUDIENCE": "replace-before-deploy",
+    "ACCESS_TEAM_DOMAIN": "https://tonymlzero.cloudflareaccess.com",
+    "ACCESS_AUDIENCE": "b0c8d2d72724e0694257e42bce64544cfa8f80ad8e9c74587c82b81324d3b3b6",
     "STATE_ISSUER": "https://aegisdesk.tonyml.com",
     "STATE_KEY_ID": "ed25519-2026-01",
     "CONTACT_NAME": "Soporte Aegis",
