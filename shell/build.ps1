@@ -53,7 +53,7 @@ try {
             "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
         } elseif (Get-Command iscc.exe -ErrorAction SilentlyContinue) { "iscc.exe" } else { $null }
         if ($iscc) {
-            & $iscc "/O+" "/DMyAppVersion=$Version" (Join-Path $root "installer.iss")
+            & $iscc "/O+" "/DMyAppVersion=$Version" "/DMyAppURL=$WorkerBaseURL" (Join-Path $root "installer.iss")
         } else {
             Write-Warning "ISCC.exe no encontrado; se omite el instalador."
         }
