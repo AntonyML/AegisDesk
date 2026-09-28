@@ -530,8 +530,9 @@ El formulario declara la acción Turnstile `ticket`. El Worker valida longitudes
 contenido y, en Siteverify, exige `success: true`, la acción `ticket` y el
 hostname de la solicitud (`aegisdesk.tonyml.com` en producción). Persiste
 primero el ticket y después intenta enviar el correo mediante Resend.
-Respuesta normal `202`: `{"ticket_id":"<uuid>","notified":true}`. La persona
-recibe un folio, no el contenido de un error del Worker.
+Respuesta normal `202`: `{"ticket_id":"<uuid>","notified":true}`. El UUID se
+conserva para soporte y panel, pero nunca se muestra al público. La interfaz
+presenta un toast breve de confirmación o error, sin exponer detalles internos.
 
 ### Panel protegido
 
