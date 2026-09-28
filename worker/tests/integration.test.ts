@@ -222,6 +222,26 @@ describe("AegisDesk Worker integrated seams", () => {
       .bind(ticketId)
       .all();
     expect(rows.results).toHaveLength(1);
+
+    const resolved = await jsonRequest(
+      `/api/v1/admin/tickets/${ticketId}`,
+      {
+        method: "PATCH",
+        headers: {
+          "x-aegis-test-admin": "1",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ status: "resolved", note: "Atendido." }),
+      },
+      workerEnv,
+    );
+    expect(resolved.status).toBe(200);
+    const updatedTicket = await workerEnv.DB.prepare(
+      "SELECT status FROM tickets WHERE id = ?",
+    )
+      .bind(ticketId)
+      .first<{ status: string }>();
+    expect(updatedTicket?.status).toBe("resolved");
   });
 
   it("honors the optional ticket rate-limit binding", async () => {

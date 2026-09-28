@@ -1,4 +1,4 @@
-import { html } from "hono/html";
+import { html, raw } from "hono/html";
 
 type InstallationView = {
   id: string;
@@ -107,7 +107,7 @@ export function panelPage(
           <section><h2>Tickets</h2><table><thead><tr><th>Ticket</th><th>Descripción</th><th>Estado</th></tr></thead><tbody>${tickets.map((ticket) => html`<tr><td><strong>${ticket.team}</strong><br>${ticket.name}<br><small>${ticket.id}</small><br><small>${ticket.createdAt} · correo ${ticket.notified ? "enviado" : "pendiente"}</small></td><td>${ticket.description}</td><td><form data-ticket=${ticket.id}><select aria-label="Estado del ticket"><option value="open" selected=${ticket.status === "open"}>Abierto</option><option value="in_progress" selected=${ticket.status === "in_progress"}>En progreso</option><option value="resolved" selected=${ticket.status === "resolved"}>Resuelto</option><option value="spam" selected=${ticket.status === "spam"}>Spam</option></select><button type="submit">Guardar</button></form></td></tr>`)}</tbody></table></section>
         </div>
       </main>
-      <script>${panelScript}</script>
+      <script>${raw(panelScript)}</script>
     </body>
   </html>`;
 }
