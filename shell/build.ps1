@@ -15,6 +15,10 @@ $bin = Join-Path $root "bin"
 $dist = Join-Path $root "dist"
 New-Item -ItemType Directory -Force -Path $bin, $dist | Out-Null
 
+if ([string]::IsNullOrWhiteSpace($WorkerBaseURL)) { $WorkerBaseURL = "https://aegisdesk.example.invalid" }
+if ([string]::IsNullOrWhiteSpace($StateIssuer)) { $StateIssuer = "https://aegisdesk.example.invalid" }
+if ([string]::IsNullOrWhiteSpace($StateKeyID)) { $StateKeyID = "ed25519-2026-01" }
+
 if ($RequireVerifier) {
     if ([string]::IsNullOrWhiteSpace($PublicKeyBase64)) { throw "PublicKeyBase64 es obligatorio para un release." }
     if ($WorkerBaseURL -match "example\.invalid" -or $StateIssuer -match "example\.invalid") { throw "WorkerBaseURL y StateIssuer deben ser reales para un release." }
