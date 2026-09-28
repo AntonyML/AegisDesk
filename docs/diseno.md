@@ -106,9 +106,10 @@ Cloudflare puede modificarlas:
 - Turnstile tiene plan gratuito, hasta 20 widgets y validación obligatoria en
   servidor.
 
-El correo previsto usa el binding `send_email` de Cloudflare, con un único
-destino administrativo verificado. No se incorpora un proveedor de correo ni
-una API key al shell.
+El envío de avisos usa la API de Resend con una API key guardada como secreto
+del Worker. Email Routing de Cloudflare se reserva para recibir y reenviar la
+dirección administrativa `soporte@tonyml.com`; no se confunde recepción con
+envío y ninguna API key llega al shell.
 
 ## H0. Informe corto de reutilización
 
@@ -158,18 +159,17 @@ AegisDesk/
 │   └── README.md
 ├── worker/                        # Worker TS, panel embebido y contratos
 │   ├── src/
-│   │   ├── index.ts               # router HTTP
-│   │   ├── enrollment.ts          # códigos de un solo uso y tokens
+│   │   ├── index.ts               # router HTTP, enrolamiento, eventos y tickets
 │   │   ├── cycles.ts              # reloj y ciclos persistidos
-│   │   ├── notices.ts             # avisos que devuelve el Worker
+│   │   ├── schema.ts/db.ts        # modelo Drizzle y acceso D1
+│   │   ├── security.ts            # Access, tokens y hashes
 │   │   ├── signing.ts             # JWT EdDSA con jose
-│   │   ├── events.ts              # aperturas, consentimientos y acciones
-│   │   ├── tickets.ts             # formulario, Turnstile y send_email
+│   │   ├── validation.ts          # contratos Zod
 │   │   └── panel/                 # HTML/CSS/TS inyectado en el Worker
 │   ├── migrations/                # migraciones D1
-│   ├── tests/                     # Vitest + pool Workers + D1 local
+│   ├── tests/                     # Vitest plugin + Workers runtime + D1 local
 │   ├── package.json
-│   ├── wrangler.toml
+│   ├── wrangler.jsonc
 │   └── README.md
 └── docs/
     └── diseno.md
@@ -310,8 +310,10 @@ alerta técnica. El botón de contacto sigue disponible; la telemetría marca
   de AegisDesk. Este instala el shell en `C:\Program Files\AegisDesk\` y crea
   el estado mutable en `C:\ProgramData\AegisDesk\`. No copia nada a
   `C:\DEV\SIDC`.
-- En el primer arranque, AegisDesk pide usuario/contraseña, permite elegir el
-  ejecutable de SIDC, enrola la instalación y escribe la configuración local.
+- En el primer arranque, soporte introduce un código de enrolamiento de un solo
+  uso generado en el panel, permite elegir el ejecutable de SIDC, enrola la
+  instalación y escribe la configuración local. El shell no pide ni guarda la
+  contraseña del panel.
   No depende de una configuración interna de AegisSetup ni crea una nueva regla
   de mantenimiento en SIDC.
 - AegisDesk crea o actualiza los accesos directos de Escritorio y Menú Inicio
@@ -524,8 +526,10 @@ Worker fija `server_received_at` y el actor de Access cuando corresponda.
 }
 ```
 
-El Worker valida longitudes, contenido y Turnstile en servidor, persiste primero
-el ticket y después intenta enviar el correo mediante el binding `send_email`.
+El formulario declara la acción Turnstile `ticket`. El Worker valida longitudes,
+contenido y, en Siteverify, exige `success: true`, la acción `ticket` y el
+hostname de la solicitud (`aegisdesk.tonyml.com` en producción). Persiste
+primero el ticket y después intenta enviar el correo mediante Resend.
 Respuesta normal `202`: `{"ticket_id":"<uuid>","notified":true}`. La persona
 recibe un folio, no el contenido de un error del Worker.
 
@@ -728,23 +732,25 @@ Este texto debe pasar por la aprobación institucional antes de liberar el shell
 - Añadir una validación Turnstile en servidor, límites de cuerpo y descripción y
   rate limit de plataforma para la ruta pública, si el binding está habilitado
   en la cuenta Free. No se crea una tabla de rate limit en D1.
-- El formulario no pide correo si no es necesario. El Worker envía el aviso al
-  único destino administrativo verificado mediante el binding `send_email`, no a
-  una dirección proporcionada por el visitante.
-- Persistir primero. Si el binding falla, el ticket queda abierto con
+- El formulario no pide correo si no es necesario. El Worker envía el aviso
+  mediante Resend al único destino administrativo configurado,
+  `soporte@tonyml.com`, no a una dirección proporcionada por el visitante.
+- Persistir primero. Si Resend falla, el ticket queda abierto con
   `notified: false` y aparece en el panel para reintento o gestión manual.
 - No insertar la descripción directamente en HTML del correo sin escape. El
   correo debe incluir folio, nombre, equipo, descripción y enlace al panel, sin
   incluir tokens ni cabeceras de autenticación.
 
-### Correo con Cloudflare Email Service
+### Correo con Resend y Email Routing
 
-El Worker usará el binding `send_email` de Cloudflare. El remitente pertenece a
-un dominio incorporado a Cloudflare Email Service y el binding se restringe a
-una sola dirección de destino verificada. No hay API key de proveedor ni secreto
-de correo en el repositorio, el shell o D1. La configuración requiere validar el
-dominio en Cloudflare DNS y confirmar que el destino verificado satisface el
-flujo de soporte.
+El Worker usará la API de Resend. `RESEND_API_KEY` vive como secreto de
+Cloudflare, con permiso de envío restringido al dominio `tonyml.com`; no aparece
+en el repositorio, shell, D1 ni logs. `NOTIFY_FROM` será
+`aegisdesk@tonyml.com` y `NOTIFY_DESTINATION` será `soporte@tonyml.com`.
+
+Email Routing recibe los mensajes enviados a `soporte@tonyml.com` y los reenvía
+al buzón real de soporte. Su función es de entrada/reenrutamiento, no reemplaza
+la API de envío.
 
 El envío puede ser síncrono después de la persistencia o ejecutarse con
 `ctx.waitUntil`; en ambos casos el resultado solo actualiza `notified`. Un error
@@ -785,9 +791,9 @@ Solo viven como secretos del Worker o en el proveedor seguro de CI:
 
 - clave privada Ed25519 de firma;
 - secreto de servidor de Turnstile;
-- configuración del binding `send_email`, configuración de Access y cualquier
-  secreto de despliegue. El destinatario del correo queda restringido en el
-  binding, no se acepta desde el formulario.
+- API key de Resend, configuración de Access y cualquier secreto de despliegue.
+  El destinatario del correo queda fijado en variables del Worker, no se acepta
+  desde el formulario.
 
 El shell solo contiene claves públicas. El token de instalación se trata como
 credencial revocable: se almacena con ACL local, se hash-ea en D1 y no se
@@ -826,9 +832,10 @@ revocación local inventada.
   solo uso y tiene una ventana corta.
 - Límite de cuerpo y descripción, normalización, escape, respuesta uniforme e
   idempotencia del ticket.
-- Usar el binding de Rate Limiting de Workers para la ruta pública si está
-  disponible en la cuenta, sin duplicar un contador en D1. Se limita por ruta y
-  combinación de señales de abuso; no se toma una IP como identidad permanente.
+- Usar el binding opcional `TICKET_RATE_LIMIT` de Rate Limiting de Workers para
+  la ruta pública si está disponible en la cuenta, sin duplicar un contador en
+  D1. Se limita por ruta/IP como señal de abuso temporal; la IP no se persiste
+  ni se toma como identidad permanente.
 - No se implementan honeypot, cooldown en D1 ni cola propia en esta versión.
   Persistir primero permite gestionar manualmente cualquier fallo de correo.
 
@@ -861,7 +868,7 @@ revocación local inventada.
 | Worker o D1 llega al límite gratuito | Una llamada de estado y una telemetría por apertura, índices, paginación, no hacer polling, retención, alertas de consumo y pruebas de volumen. Workers Free son 100.000 requests/día; D1 tiene límites diarios de lecturas/escrituras. |
 | Muchos panelistas superan el límite de Access Free | Mantener el panel para pocos administradores; si crece el grupo, revisar plan antes de abrirlo a soporte general. |
 | D1 es single-threaded por base y una escritura se atasca | Transacciones pequeñas, índices, idempotencia, paginación, no guardar payloads grandes y monitorizar errores de sobrecarga. |
-| Turnstile o Email Service no responde | Persistir ticket antes del correo, `notified: false`, reintento administrativo, timeout y no bloquear SIDC. |
+| Turnstile o Resend no responde | Persistir ticket antes del correo, `notified: false`, reintento administrativo, timeout y no bloquear SIDC. |
 | Spam consume la ruta de tickets | Turnstile, rate limit de plataforma si está disponible, límites de campos, idempotencia y gestión manual; no se guarda un contador de IP en D1. |
 | Token de instalación filtrado | Token aleatorio por PC, hash en D1, revocación, límites por instalación, ninguna capacidad administrativa y renovación del token desde un flujo controlado. |
 | Respuesta firmada antigua se reproduce offline | TTL firmado, `server_time`, caché de última respuesta, no generar avisos locales, refresco obligatorio cuando vuelva la red y aceptación explícita de que fail-open impide revocación instantánea offline. |
@@ -877,8 +884,8 @@ intercambio antes de aprobar la Fase 2.
    confirmar la marca final antes del primer release público.
 2. **Nombre y datos de contacto visibles.** Recomiendo definir un nombre
    institucional o de soporte, una URL HTTPS estable del formulario y una única
-   dirección administrativa verificada para el binding `send_email` antes del
-   primer enrolamiento.
+   dirección remitente verificada en Resend, API key de envío restringida y regla
+   de Email Routing antes del primer enrolamiento.
 3. **Destino exacto de SIDC.** Recomiendo que AegisSetup configure como destino
    el ejecutable operativo generado `*_AegisSetup.exe`, nunca `*_ORIGINAL.exe`,
    y que el shell no busque ejecutables alternativos.
@@ -980,6 +987,8 @@ todavía pueda cambiar.
 **W1 — Base del Worker y D1.**
 
 - Wrangler, configuración de preview/prod, migraciones y tablas mínimas.
+- Vitest con el plugin oficial de Cloudflare, runtime Workers y D1 local real;
+  Biome en cada verificación.
 - Tests de migración limpia, índices, paginación y límites de longitud.
 - Integración local con D1 de prueba; ningún test usa la base de producción.
 
@@ -1006,15 +1015,16 @@ todavía pueda cambiar.
 - Tests cruzados: el shell verifica una respuesta producida por el Worker de
   prueba y rechaza modificaciones de cualquier campo firmado.
 - Guardas de privacidad y esquema de telemetría.
-- Eventos integrados de `required`, `checked`, `countdown_completed`, `accepted`
-  y `declined`, correlacionados con la apertura y el ciclo vencido.
+- Eventos integrados de `consent_required`, `countdown_completed`,
+  `consent_accepted` y `consent_declined`, correlacionados con la apertura y el
+  ciclo vencido.
 
-**W5 — Tickets, Turnstile y Email Service.**
+**W5 — Tickets, Turnstile, Resend y Email Routing.**
 
 - Formulario público, validación de servidor, anti-spam, persistencia previa y
   estado de notificación.
-- Mock de Siteverify y fake del binding `send_email` en tests; jamás usar correo
-  real en CI.
+- Mock de Siteverify y fake de la API Resend en tests; jamás usar correo real en
+  CI.
 - Test de fallo de correo, `notified: false`, retry administrativo, escape HTML,
   descripción grande y abuso de frecuencia.
 
@@ -1046,7 +1056,7 @@ Antes de pedir aprobación de producción se debe ejecutar una prueba completa:
 de enrolamiento y selecciona ruta → creación del acceso directo → shell pide
 JWT de estado → Worker persiste apertura → shell muestra aviso → shell abre un
 SIDC de prueba → Worker recibe eventos → formulario crea ticket → D1 lo conserva
-→ Email Service intenta el aviso → panel Access muestra y gestiona todo.`
+→ Resend intenta el aviso → Email Routing reenvía → panel Access muestra y gestiona todo.`
 
 La misma secuencia se repite con Worker inaccesible y red desconectada. Si la
 última respuesta firmada no indica vencimiento, el resultado esperado es que SIDC
@@ -1065,9 +1075,8 @@ disponibilidad del estado fresco y de la telemetría.
 - [Cloudflare Turnstile — Server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)
 - [Cloudflare Workers — Rate Limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
 - [Cloudflare Workers — Web Crypto](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/)
-- [Cloudflare Email Service — Send bindings](https://developers.cloudflare.com/email-service/configuration/send-bindings/)
-- [Cloudflare Email Service — Workers API](https://developers.cloudflare.com/email-service/api/send-emails/workers-api/)
-- [Cloudflare Email Routing — Verified destinations](https://developers.cloudflare.com/email-routing/setup/email-routing-addresses/)
+- [Cloudflare Email Routing — Verified destinations](https://developers.cloudflare.com/email-routing/configuration/email-routing-addresses/)
+- [Resend — Send Email API](https://resend.com/docs/api-reference/emails/send-email)
 - [Hono — JSX](https://hono.dev/docs/guides/jsx)
 - [Hono — htmx example](https://hono.dev/examples/htmx)
 - [Drizzle — Cloudflare D1](https://orm.drizzle.team/docs/sqlite/connect-cloudflare-d1)
