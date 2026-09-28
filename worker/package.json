@@ -9,6 +9,8 @@
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome format --write .",
+    "verify": "npm run typecheck && npm test -- --run && npm run lint && npm run check",
+    "deploy": "npm run verify && wrangler deploy",
     "check": "wrangler deploy --dry-run",
     "deploy:dry": "wrangler deploy --dry-run"
   },

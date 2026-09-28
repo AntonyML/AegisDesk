@@ -19,6 +19,7 @@ npm run typecheck
 npm test
 npm run lint
 npm run check
+npm run verify
 npm run deploy:dry
 ```
 
@@ -53,6 +54,34 @@ valores ficticios. `.dev.vars` no debe entrar al repositorio. La clave privada
 Los valores `example.invalid`, el identificador D1 de ceros y las direcciones
 de ejemplo son bloqueadores deliberados de despliegue. Se deben cambiar antes
 de crear el primer código de enrolamiento.
+
+## Desplegar cambios a producción
+
+`git push` y el despliegue de Cloudflare son operaciones distintas. Para
+publicar el Worker en el entorno configurado por `wrangler.jsonc`, usar:
+
+```powershell
+npm run deploy
+```
+
+Este comando ejecuta, en orden, typecheck, los tests integrados, lint y
+`wrangler deploy --dry-run`; solo si todo pasa ejecuta `wrangler deploy`.
+Usa la versión local de Wrangler declarada en `package.json`.
+
+Antes del primer despliegue de producción deben existir en Cloudflare, dentro
+del entorno **Producción**:
+
+- Secreto `STATE_PRIVATE_KEY` con la clave privada Ed25519 en PKCS#8 PEM.
+- Secreto `TURNSTILE_SECRET`.
+- Secreto `RESEND_API_KEY`.
+- Variables `STATE_ISSUER`, `STATE_KEY_ID`, `ACCESS_TEAM_DOMAIN`,
+  `ACCESS_AUDIENCE`, `CONTACT_NAME`, `TICKET_URL`, `NOTIFY_FROM` y
+  `NOTIFY_DESTINATION`.
+
+El comando `npm run deploy` modifica el Worker remoto. Ejecutarlo solo cuando
+los cambios locales ya estén revisados y las migraciones D1 estén aplicadas.
+Los cambios de secretos con `wrangler secret put` también crean una versión y
+la despliegan inmediatamente.
 
 ## Operación
 
