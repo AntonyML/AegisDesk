@@ -128,15 +128,15 @@ jobs:
           tag_name: ${{ steps.semver.outputs.version_tag }}
           name: Release ${{ steps.semver.outputs.version_tag }}
           body: |
-            ## 📦 Artefactos Oficiales de AegisDesk (SIDC)
+            ## 📦 Artefactos Oficiales de AegisDesk
 
             | Archivo | Tipo | Descripción |
             | :--- | :--- | :--- |
-            | **`AegisDesk-Setup-v${{ steps.semver.outputs.version }}.exe`** | **Instalador Oficial (Inno Setup)** | **Recomendado para Terminales.** Asistente guiado de instalación, configuración inicial, acceso directo en Escritorio para SIDC y desinstalador limpio. |
+            | **`AegisDesk-Setup-v${{ steps.semver.outputs.version }}.exe`** | **Instalador Oficial (Inno Setup)** | **Recomendado para Terminales.** Asistente guiado de instalación, configuración inicial, acceso directo en Escritorio y desinstalador limpio. |
             | **`AegisDesk.exe`** | **Binario Portable** | Ejecutable de escritorio independiente. |
 
             ---
-            *Desarrollado para el ecosistema SIDC.*
+            *Desarrollado para el ecosistema Aegis.*
           files: |
             shell/dist/*.exe
             shell/bin/AegisDesk.exe
