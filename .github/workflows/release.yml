@@ -99,12 +99,9 @@ jobs:
             Version = $ver
             Installer = $true
           }
-          if ("${{ vars.AEGISDESK_WORKER_BASE_URL }}") { $buildArgs["WorkerBaseURL"] = "${{ vars.AEGISDESK_WORKER_BASE_URL }}" }
-          if ("${{ vars.AEGISDESK_STATE_ISSUER }}") { $buildArgs["StateIssuer"] = "${{ vars.AEGISDESK_STATE_ISSUER }}" }
-          if ("${{ vars.AEGISDESK_STATE_KEY_ID }}") { $buildArgs["StateKeyID"] = "${{ vars.AEGISDESK_STATE_KEY_ID }}" }
-          if ("${{ vars.AEGISDESK_STATE_PUBLIC_KEY_B64 }}") {
-            $buildArgs["PublicKeyBase64"] = "${{ vars.AEGISDESK_STATE_PUBLIC_KEY_B64 }}"
-            $buildArgs["RequireVerifier"] = $true
+          if ("${{ vars.AEGISDESK_WORKER_BASE_URL }}") {
+            $buildArgs["WorkerBaseURL"] = "${{ vars.AEGISDESK_WORKER_BASE_URL }}"
+            $buildArgs["StateIssuer"] = "${{ vars.AEGISDESK_WORKER_BASE_URL }}"
           }
           .\build.ps1 @buildArgs
 

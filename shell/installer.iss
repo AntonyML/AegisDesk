@@ -4,7 +4,7 @@
   #define MyAppVersion "0.1.0"
 #endif
 #define MyAppPublisher "Soporte Aegis"
-#define MyAppURL "https://aegisdesk.example.invalid"
+#define MyAppURL "https://aegisdesk.tonyml.com"
 #define MyAppExeName "AegisDesk.exe"
 
 [Setup]

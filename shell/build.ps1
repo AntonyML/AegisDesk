@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Version = "dev",
-    [string]$WorkerBaseURL = "https://aegisdesk.example.invalid",
-    [string]$StateIssuer = "https://aegisdesk.example.invalid",
+    [string]$WorkerBaseURL = "https://aegisdesk.tonyml.com",
+    [string]$StateIssuer = "https://aegisdesk.tonyml.com",
     [string]$StateKeyID = "ed25519-2026-01",
     [string]$PublicKeyBase64 = "",
     [switch]$Installer,
@@ -15,13 +15,12 @@ $bin = Join-Path $root "bin"
 $dist = Join-Path $root "dist"
 New-Item -ItemType Directory -Force -Path $bin, $dist | Out-Null
 
-if ([string]::IsNullOrWhiteSpace($WorkerBaseURL)) { $WorkerBaseURL = "https://aegisdesk.example.invalid" }
-if ([string]::IsNullOrWhiteSpace($StateIssuer)) { $StateIssuer = "https://aegisdesk.example.invalid" }
+if ([string]::IsNullOrWhiteSpace($WorkerBaseURL)) { $WorkerBaseURL = "https://aegisdesk.tonyml.com" }
+if ([string]::IsNullOrWhiteSpace($StateIssuer)) { $StateIssuer = $WorkerBaseURL }
 if ([string]::IsNullOrWhiteSpace($StateKeyID)) { $StateKeyID = "ed25519-2026-01" }
 
 if ($RequireVerifier) {
-    if ([string]::IsNullOrWhiteSpace($PublicKeyBase64)) { throw "PublicKeyBase64 es obligatorio para un release." }
-    if ($WorkerBaseURL -match "example\.invalid" -or $StateIssuer -match "example\.invalid") { throw "WorkerBaseURL y StateIssuer deben ser reales para un release." }
+    if ([string]::IsNullOrWhiteSpace($PublicKeyBase64)) { throw "PublicKeyBase64 es obligatorio cuando se especifica -RequireVerifier." }
 }
 
 Push-Location $root
