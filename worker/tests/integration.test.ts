@@ -316,7 +316,13 @@ describe("AegisDesk Worker integrated seams", () => {
     const workerEnv = await testEnvironment();
     const publicPage = await jsonRequest("/tickets", {}, workerEnv);
     expect(publicPage.status).toBe(200);
-    expect(await publicPage.text()).toContain("Soporte SIDC");
+    const publicHtml = await publicPage.text();
+    expect(publicHtml).toContain("Soporte Aegis");
+    expect(publicHtml).not.toContain("Soporte SIDC");
+    expect(publicHtml).toContain('id="ticket-toast"');
+    expect(publicHtml).toContain("Ticket enviado correctamente");
+    expect(publicHtml).toContain("turnstile.reset");
+    expect(publicHtml).not.toContain("Ticket registrado:");
 
     const panel = await jsonRequest(
       "/panel",
