@@ -1,0 +1,41 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "aegisdesk-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "ACCESS_TEAM_DOMAIN": "https://example.cloudflareaccess.com",
+    "ACCESS_AUDIENCE": "replace-before-deploy",
+    "STATE_ISSUER": "https://aegisdesk.tonyml.com",
+    "STATE_KEY_ID": "ed25519-2026-01",
+    "CONTACT_NAME": "Soporte SIDC",
+    "TICKET_URL": "https://aegisdesk.tonyml.com/tickets",
+    "PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAAFHgQ5CkC8xaE4Xk",
+    "NOTIFY_FROM": "aegisdesk@tonyml.com",
+    "NOTIFY_DESTINATION": "soporte@tonyml.com"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "aegisdesk",
+      "database_id": "70e707bc-09d0-4dfe-b79e-4b1b1e15e630",
+      "migrations_dir": "./migrations"
+    }
+  ],
+  "triggers": {
+    "crons": ["0 3 * * SUN"]
+  },
+  "routes": [
+    {
+      "pattern": "aegisdesk.tonyml.com",
+      "custom_domain": true
+    }
+  ]
+}

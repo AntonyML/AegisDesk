@@ -1,0 +1,13 @@
+ENVIRONMENT=development
+ACCESS_TEAM_DOMAIN=https://example.cloudflareaccess.com
+ACCESS_AUDIENCE=replace-before-local-panel-test
+STATE_ISSUER=https://aegisdesk.tonyml.com
+STATE_KEY_ID=ed25519-2026-01
+STATE_PRIVATE_KEY=replace-with-pkcs8-ed25519-secret
+CONTACT_NAME=Soporte SIDC
+TICKET_URL=https://aegisdesk.tonyml.com/tickets
+PUBLIC_TURNSTILE_SITE_KEY=replace-before-deploy
+TURNSTILE_SECRET=replace-before-deploy
+RESEND_API_KEY=replace-with-resend-secret
+NOTIFY_FROM=aegisdesk@tonyml.com
+NOTIFY_DESTINATION=soporte@tonyml.com
