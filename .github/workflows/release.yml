@@ -1,0 +1,87 @@
+name: Build and Release AegisDesk
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  worker:
+    name: Test and validate Worker
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci
+      - run: npm run types
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run lint
+      - run: npm run deploy:dry
+
+  shell:
+    name: Test and package shell
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: shell
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: shell/go.mod
+          cache-dependency-path: shell/go.sum
+      - run: gofmt -l .
+      - run: go vet ./...
+      - run: go test ./... -count=1
+      - shell: pwsh
+        run: |
+          $env:GOOS = "linux"
+          go build ./...
+          Remove-Item Env:GOOS
+      - shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          .\build.ps1 -Version $version -WorkerBaseURL "${{ vars.AEGISDESK_WORKER_BASE_URL }}" -StateIssuer "${{ vars.AEGISDESK_STATE_ISSUER }}" -StateKeyID "${{ vars.AEGISDESK_STATE_KEY_ID }}" -PublicKeyBase64 "${{ vars.AEGISDESK_STATE_PUBLIC_KEY_B64 }}" -RequireVerifier
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AegisDesk-shell-${{ github.ref_name }}
+          path: shell/bin/AegisDesk.exe
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [worker, shell]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AegisDesk-shell-${{ github.ref_name }}
+          path: shell/bin
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: shell/go.mod
+      - shell: pwsh
+        working-directory: shell
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          .\build.ps1 -Version $version -WorkerBaseURL "${{ vars.AEGISDESK_WORKER_BASE_URL }}" -StateIssuer "${{ vars.AEGISDESK_STATE_ISSUER }}" -StateKeyID "${{ vars.AEGISDESK_STATE_KEY_ID }}" -PublicKeyBase64 "${{ vars.AEGISDESK_STATE_PUBLIC_KEY_B64 }}" -RequireVerifier -Installer
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            shell/bin/AegisDesk.exe
+            shell/dist/AegisDesk-Setup-*.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Cloudflare Workers & Wrangler
+.wrangler/
+*/.wrangler/
+worker-configuration.d.ts
+*/worker-configuration.d.ts
+
+# Environment and secrets (never commit real credentials)
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+*/bin/
+dist/
+*/dist/
+
+# Inno Setup output
+Output/
+*/Output/
+
+# Test and coverage artifacts
+coverage/
+*.coverprofile
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
