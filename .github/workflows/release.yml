@@ -63,7 +63,8 @@ jobs:
             throw "TODO: configurar la variable de repositorio INNO_SETUP_SHA256 con el SHA-256 verificado de Inno Setup $env:INNO_SETUP_VERSION antes de publicar."
           }
           $installer = Join-Path $env:RUNNER_TEMP "innosetup-$env:INNO_SETUP_VERSION.exe"
-          $url = "https://files.jrsoftware.org/is/6/innosetup-$env:INNO_SETUP_VERSION.exe"
+          $tag = 'is-' + $env:INNO_SETUP_VERSION.Replace('.', '_')
+          $url = "https://github.com/jrsoftware/issrc/releases/download/$tag/innosetup-$env:INNO_SETUP_VERSION.exe"
           Invoke-WebRequest -Uri $url -OutFile $installer
           $actual = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
           if ($actual -ne $env:INNO_SETUP_SHA256.Trim().ToLower()) { throw "Hash de Inno Setup no coincide: $actual" }
