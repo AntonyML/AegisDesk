@@ -28,7 +28,9 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=dist
 OutputBaseFilename=AegisDesk-Setup-v{#MyAppVersion}
-SetupIconFile=assets\aegisdesk.ico
+SetupIconFile=assets\aegis_shell.ico
+WizardImageFile=assets\wizard-brand.bmp
+WizardSmallImageFile=assets\wizard-brand-small.bmp
 UninstallDisplayIcon={app}\aegis_shell.ico
 Compression=lzma2/max
 SolidCompression=yes
@@ -43,7 +45,6 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 [Files]
 Source: "bin\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "assets\aegis_shell.ico"; DestDir: "{app}"; Flags: ignoreversion
-Source: "assets\aegisdesk.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD_PARTY_NOTICES.md"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 Source: "..\SECURITY.md"; DestDir: "{app}\LICENSES"; Flags: ignoreversion

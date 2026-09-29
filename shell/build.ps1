@@ -29,6 +29,7 @@ if ($AllowUnsignedDev) {
 
 Push-Location $root
 try {
+    & (Join-Path $root 'generate-branding.ps1')
     gofmt -w .
     go vet ./...
     go test ./... -count=1
@@ -68,17 +69,13 @@ try {
     Copy-Item $privacySource, (Join-Path $legalRoot "LEGAL_VERSION.json"), (Join-Path $legalRoot "retention-policy.md"), (Join-Path $legalRoot "subprocessors.md"), (Join-Path $legalRoot "incident-response.md"), (Join-Path $legalRoot "organization-authorization-outline.md") $legalStage -Force
     Copy-Item (Join-Path $root "..\THIRD_PARTY_NOTICES.md") (Join-Path $legalStage "THIRD_PARTY_NOTICES.md") -Force
 
-    $syso = Join-Path $root "cmd\aegisdesk\resource_windows_amd64.syso"
-    if (-not (Test-Path $syso)) {
-        Push-Location (Join-Path $root "cmd\aegisdesk")
-        try {
-            go run github.com/josephspurrier/goversioninfo/cmd/goversioninfo versioninfo.json
-            if (Test-Path "resource.syso") {
-                Move-Item -Force "resource.syso" "resource_windows_amd64.syso"
-            }
-        } finally {
-            Pop-Location
-        }
+    # Always regenerate: a cached resource may contain an older logo.
+    Push-Location (Join-Path $root "cmd\aegisdesk")
+    try {
+        go run github.com/josephspurrier/goversioninfo/cmd/goversioninfo -o resource_windows_amd64.syso versioninfo.json
+        if ($LASTEXITCODE -ne 0) { throw 'No se pudieron generar los recursos del ejecutable.' }
+    } finally {
+        Pop-Location
     }
 
     $temporary = Join-Path $bin "AegisDesk.exe.tmp"
