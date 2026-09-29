@@ -1,9 +1,11 @@
+import type { ShellConfig } from "../../contracts/shell-config";
 import { CycleReader, cyclePolicy } from "../domain/cycles";
 import type { EventInput, StateInput } from "../http/validation";
 import { EventRepository } from "../persistence/repositories/event-repository";
 import { InstallationRepository } from "../persistence/repositories/installation-repository";
 import type { InstallationRecord } from "../persistence/schema";
 import { StateSigner } from "../security/signing";
+import { ShellConfigService } from "./shell-config-service";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -12,6 +14,7 @@ export class ShellService {
   private readonly events: EventRepository;
   private readonly installations: InstallationRepository;
   private readonly signer: StateSigner;
+  private readonly config: ShellConfigService;
 
   constructor(
     private readonly env: Env,
@@ -21,6 +24,7 @@ export class ShellService {
     this.events = new EventRepository(env);
     this.installations = new InstallationRepository(env);
     this.signer = new StateSigner(env);
+    this.config = new ShellConfigService(env, now);
   }
 
   async state(
@@ -34,12 +38,16 @@ export class ShellService {
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
     ).toISOString();
     const eventTypes = await this.events.typesForDay(installation.id, dayStart);
-    const notice = cyclePolicy.evaluate(
-      now,
-      cycle,
-      eventTypes,
-      this.env.CONTACT_NAME,
-    );
+    const shellConfig = await this.config.build(installation);
+    const notice =
+      installation.status === "active"
+        ? cyclePolicy.evaluate(
+            now,
+            cycle,
+            eventTypes,
+            shellConfig.support.area_name || this.env.CONTACT_NAME,
+          )
+        : null;
     await this.events.insert({
       id: crypto.randomUUID(),
       installationId: installation.id,
@@ -76,10 +84,39 @@ export class ShellService {
         server_time: serverTime,
         cache_until: cacheUntil,
         contact: {
-          name: this.env.CONTACT_NAME,
-          ticket_url: this.env.TICKET_URL,
+          name: shellConfig.support.area_name || this.env.CONTACT_NAME,
+          ticket_url:
+            shellConfig.support.links.find(
+              (link) => link.label === "Abrir ticket",
+            )?.url || this.env.TICKET_URL,
         },
         notices: notice ? [notice] : [],
+        config: shellConfig,
+      }),
+    };
+  }
+
+  async configToken(installation: InstallationRecord): Promise<{
+    config: ShellConfig;
+    config_token: string;
+  }> {
+    const config = await this.config.build(installation);
+    const now = this.now();
+    return {
+      config,
+      config_token: await this.signer.sign({
+        sub: installation.id,
+        protocol_version: 1,
+        server_time: now.toISOString(),
+        cache_until: new Date(now.getTime() + DAY_MS).toISOString(),
+        contact: {
+          name: config.support.area_name || this.env.CONTACT_NAME,
+          ticket_url:
+            config.support.links.find((link) => link.label === "Abrir ticket")
+              ?.url || this.env.TICKET_URL,
+        },
+        notices: [],
+        config,
       }),
     };
   }

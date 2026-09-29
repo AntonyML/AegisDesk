@@ -32,6 +32,24 @@ export function createShellRoutes(): Hono<{ Bindings: Env }> {
     return c.json(await new ShellService(c.env).state(installation, input));
   });
 
+  routes.get("/api/v1/shell/config", async (c) => {
+    const installation = await new InstallationAuthenticator(
+      c.env,
+    ).authenticate(c.req.raw);
+    const result = await new ShellService(c.env).configToken(installation);
+    const etag = `"${result.config.revision}"`;
+    const headers = new Headers({
+      "cache-control": "no-cache",
+      etag,
+      "content-type": "application/json; charset=UTF-8",
+    });
+    const requestTag = c.req.header("if-none-match");
+    if (requestTag === etag || requestTag === `W/${etag}`) {
+      return new Response(null, { status: 304, headers });
+    }
+    return new Response(JSON.stringify(result), { headers });
+  });
+
   routes.post("/api/v1/shell/events", async (c) => {
     const installation = await new InstallationAuthenticator(
       c.env,

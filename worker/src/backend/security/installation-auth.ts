@@ -15,7 +15,7 @@ export class InstallationAuthenticator {
     const token = bearer(request);
     if (!token) throw new RequestError("installation_auth_required", 401);
     const row = await this.repository.findByTokenHash(await sha256(token));
-    if (row?.status !== "active") {
+    if (!row || row.status === "revoked") {
       throw new RequestError("installation_revoked_or_unknown", 403);
     }
     return row;

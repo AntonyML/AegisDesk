@@ -1,4 +1,5 @@
 import { importPKCS8, SignJWT } from "jose";
+import type { ShellConfig } from "../../contracts/shell-config";
 import type { Notice } from "../domain/cycles";
 
 export type StatePayload = {
@@ -14,6 +15,7 @@ export type StatePayload = {
   cache_until: string;
   contact: { name: string; ticket_url: string };
   notices: Notice[];
+  config?: ShellConfig;
 };
 
 export class StateSigner {
@@ -34,6 +36,7 @@ export class StateSigner {
       cache_until: input.cache_until,
       contact: input.contact,
       notices: input.notices,
+      ...(input.config ? { config: input.config } : {}),
     })
       .setProtectedHeader({
         alg: "EdDSA",
