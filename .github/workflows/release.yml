@@ -137,7 +137,8 @@ jobs:
             creationInfo = [ordered]@{ created = (Get-Date).ToUniversalTime().ToString('o'); creators = @('Tool: AegisDesk release workflow') }
             packages = @($sbomPackages)
           } | ConvertTo-Json -Depth 8 | Out-File (Join-Path $releaseDir 'sbom.spdx.json') -Encoding utf8
-          Get-ChildItem $releaseDir -File | Get-FileHash -Algorithm SHA256 | ForEach-Object { '{0}  {1}' -f $_.Hash.ToLower(), (Split-Path $_.Path -Leaf) } | Out-File (Join-Path $releaseDir 'SHA256SUMS') -Encoding ascii
+          $checksums = @(Get-ChildItem $releaseDir -File | Where-Object { $_.Name -ne 'SHA256SUMS' } | Sort-Object Name | Get-FileHash -Algorithm SHA256 | ForEach-Object { '{0}  {1}' -f $_.Hash.ToLower(), (Split-Path $_.Path -Leaf) })
+          $checksums | Out-File (Join-Path $releaseDir 'SHA256SUMS') -Encoding ascii
           "release_dir=$releaseDir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Upload immutable build bundle
