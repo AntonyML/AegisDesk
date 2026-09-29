@@ -1,0 +1,3 @@
+# Legal acceptance hashes require identical LF bytes on every platform.
+/docs/legal/*.md text eol=lf
+/docs/legal/LEGAL_VERSION.json text eol=lf
