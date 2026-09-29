@@ -17,6 +17,14 @@ import (
 )
 
 func main() {
+	supportOnly := false
+	for _, arg := range os.Args[1:] {
+		switch strings.ToLower(arg) {
+		case "--support", "-support", "--soporte", "-soporte", "/support", "/soporte":
+			supportOnly = true
+		}
+	}
+
 	store := state.DefaultStore()
 	logger, loggerErr := ui.NewLogger(store.Root)
 	if loggerErr == nil {
@@ -51,15 +59,65 @@ func main() {
 	}
 	client := state.NewClient(store, verifier)
 	openID := newOpenID()
+
+	// 1. Synchronize remote configuration from worker with ETag / cache fallback
+	effectiveConfig, isOffline := client.ResolveEffectiveConfig(context.Background(), config, version, "unknown", logger)
+	effectiveStatus := effectiveConfig.Installation.Status
+	if effectiveStatus == "" {
+		effectiveStatus = "active"
+	}
+
+	// 2. Check administrative blocking policy (DISABLED)
+	if effectiveStatus == "disabled" || effectiveStatus == "revoked" {
+		if logger != nil {
+			logger.Printf("launch blocked: installation disabled")
+		}
+		_ = client.SendEvent(context.Background(), config, state.Event{
+			ProtocolVersion: state.ProtocolVersion,
+			OpenID:          openID,
+			Type:            "launch_result",
+			WindowsUser:     windowsUser(),
+			EquipmentName:   config.EquipmentName,
+			ShellVersion:    version,
+			SIDCVersion:     "unknown",
+			LaunchResult:    "not_attempted",
+		})
+		dialogs.Support(context.Background(), ui.SupportOptions{
+			Config:    effectiveConfig,
+			Status:    "disabled",
+			IsOffline: isOffline,
+			AutoClose: 0,
+		})
+		return
+	}
+
+	// 3. Support-only mode
+	if supportOnly {
+		if logger != nil {
+			logger.Printf("support opened manually")
+		}
+		dialogs.Support(context.Background(), ui.SupportOptions{
+			Config:    effectiveConfig,
+			Status:    effectiveStatus,
+			IsOffline: isOffline,
+			AutoClose: 0,
+		})
+		return
+	}
+
+	// 4. Normal active launch flow
 	resolved := client.Resolve(context.Background(), config, openID, version, "unknown")
 	if resolved.Failure != "" && logger != nil {
 		logger.Printf("state resolution fallback: %s", resolved.Failure)
 	}
-	contact := resolved.Contact
-	if contact.Name == "" {
-		contact = state.Contact{Name: config.ContactName, TicketURL: config.TicketURL}
-	}
-	dialogs.Contact(context.Background(), contact)
+
+	// Present modern support dialog with auto-close
+	dialogs.Support(context.Background(), ui.SupportOptions{
+		Config:    effectiveConfig,
+		Status:    "active",
+		IsOffline: isOffline,
+		AutoClose: 4 * time.Second,
+	})
 
 	for _, notice := range resolved.Notices {
 		if notice.RequiresConsent {
@@ -68,6 +126,7 @@ func main() {
 		dialogs.Notice(context.Background(), notice)
 	}
 
+	// Maintenance cycle consent door
 	if notice, required := resolved.ExpiredNotice(); required {
 		_ = client.SendEvent(context.Background(), config, state.Event{
 			ProtocolVersion: state.ProtocolVersion,
@@ -90,6 +149,7 @@ func main() {
 		}
 	}
 
+	// Launch SIDC executable
 	launchResult := "success"
 	if err := launch.Start(context.Background(), config.SIDCTarget); err != nil {
 		launchResult = "failed"
