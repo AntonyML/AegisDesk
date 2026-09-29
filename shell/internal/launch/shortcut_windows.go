@@ -53,8 +53,16 @@ func CreateDesktopShortcut(shellPath, workingDirectory, displayName string) erro
 		return fmt.Errorf("set shortcut working directory: %w", err)
 	}
 	iconPath := shellPath
-	if candidate := filepath.Join(filepath.Dir(shellPath), "aegisdesk.ico"); fileExists(candidate) {
-		iconPath = candidate
+	candidates := []string{
+		filepath.Join(filepath.Dir(shellPath), "aegis_shell.ico"),
+		filepath.Join(filepath.Dir(shellPath), "assets", "aegis_shell.ico"),
+		filepath.Join(filepath.Dir(shellPath), "aegisdesk.ico"),
+	}
+	for _, candidate := range candidates {
+		if fileExists(candidate) {
+			iconPath = candidate
+			break
+		}
 	}
 	if _, err := oleutil.PutProperty(shortcut, "IconLocation", iconPath+",0"); err != nil {
 		return fmt.Errorf("set shortcut icon: %w", err)

@@ -23,7 +23,7 @@ AllowNoIcons=yes
 OutputDir=dist
 OutputBaseFilename=AegisDesk-Setup-v{#MyAppVersion}
 SetupIconFile=assets\aegisdesk.ico
-UninstallDisplayIcon={app}\aegisdesk.ico
+UninstallDisplayIcon={app}\aegis_shell.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -35,11 +35,12 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Files]
 Source: "bin\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "assets\aegis_shell.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "assets\aegisdesk.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\aegisdesk.ico"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\aegis_shell.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
 [Run]

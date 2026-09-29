@@ -41,6 +41,20 @@ try {
     if ($PublicKeyBase64) {
         $ldflags += " -X aegisdesk-shell/internal/state.EmbeddedPublicKeyBase64=$PublicKeyBase64"
     }
+
+    $syso = Join-Path $root "cmd\aegisdesk\resource_windows_amd64.syso"
+    if (-not (Test-Path $syso)) {
+        Push-Location (Join-Path $root "cmd\aegisdesk")
+        try {
+            go run github.com/josephspurrier/goversioninfo/cmd/goversioninfo versioninfo.json
+            if (Test-Path "resource.syso") {
+                Move-Item -Force "resource.syso" "resource_windows_amd64.syso"
+            }
+        } finally {
+            Pop-Location
+        }
+    }
+
     $temporary = Join-Path $bin "AegisDesk.exe.tmp"
     $target = Join-Path $bin "AegisDesk.exe"
     if (Test-Path $temporary) { Remove-Item -Force $temporary }
