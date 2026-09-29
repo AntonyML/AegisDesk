@@ -2,18 +2,24 @@ package ui
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ncruces/zenity"
-	"github.com/pkg/browser"
 
 	"aegisdesk-shell/internal/state"
 )
 
+type SupportOptions struct {
+	Config    state.ShellConfig
+	Status    string // "active", "disabled", "offline", "config_error"
+	IsOffline bool
+	AutoClose time.Duration // e.g. 4 seconds for active startup; 0 for disabled/manual
+}
+
 type Dialogs interface {
 	Contact(ctx context.Context, contact state.Contact)
+	Support(ctx context.Context, opts SupportOptions)
 	Notice(ctx context.Context, notice state.Notice)
 	EnrollmentCode(ctx context.Context) (string, error)
 	SelectSIDC(ctx context.Context) (string, error)
@@ -22,21 +28,29 @@ type Dialogs interface {
 
 type Zenity struct{}
 
-func (Zenity) Contact(parent context.Context, contact state.Contact) {
-	ctx, cancel := context.WithTimeout(parent, 4*time.Second)
-	defer cancel()
-	message := fmt.Sprintf("¿Hay algún error? Contacta con %s", contact.Name)
-	err := zenity.Question(message,
-		zenity.Title("AegisDesk"),
-		zenity.ExtraButton("Abrir tickets"),
-		zenity.OKLabel("Cerrar"),
-		zenity.CancelLabel("Cerrar"),
-		zenity.Context(ctx),
-		zenity.Width(420),
-	)
-	if errors.Is(err, zenity.ErrExtraButton) && contact.TicketURL != "" {
-		_ = browser.OpenURL(contact.TicketURL)
+func (z Zenity) Support(ctx context.Context, opts SupportOptions) {
+	_ = showNativeSupportDialog(ctx, opts)
+}
+
+func (z Zenity) Contact(parent context.Context, contact state.Contact) {
+	cfg := state.ShellConfig{
+		SchemaVersion: 1,
+		Support: state.SupportConfig{
+			Title:    "AegisDesk",
+			Message:  "¿Necesitás ayuda con SIDC?",
+			AreaName: contact.Name,
+		},
 	}
+	if contact.TicketURL != "" {
+		cfg.Support.Links = []state.SupportLink{
+			{Label: "Abrir ticket", URL: contact.TicketURL},
+		}
+	}
+	z.Support(parent, SupportOptions{
+		Config:    cfg,
+		Status:    "active",
+		AutoClose: 4 * time.Second,
+	})
 }
 
 func (Zenity) Notice(parent context.Context, notice state.Notice) {
@@ -46,10 +60,10 @@ func (Zenity) Notice(parent context.Context, notice state.Notice) {
 	if notice.Title != "" {
 		message = notice.Title + "\n\n" + message
 	}
-	_ = zenity.Question(message,
+	// Use zenity.Info with single OKLabel to eliminate duplicate Cerrar bug
+	_ = zenity.Info(message,
 		zenity.Title("AegisDesk · Aviso"),
 		zenity.OKLabel("Cerrar"),
-		zenity.CancelLabel("Cerrar"),
 		zenity.Context(ctx),
 		zenity.Width(460),
 	)
