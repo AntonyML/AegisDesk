@@ -82,6 +82,28 @@ func (s Store) SaveCache(token string) error {
 	return nil
 }
 
+func (s Store) LoadShellConfig() (ShellConfig, error) {
+	data, err := os.ReadFile(filepath.Join(s.Root, "shell_config.json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return ShellConfig{}, ErrNotConfigured
+	}
+	if err != nil {
+		return ShellConfig{}, fmt.Errorf("read shell config cache: %w", err)
+	}
+	var config ShellConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return ShellConfig{}, fmt.Errorf("parse shell config cache: %w", err)
+	}
+	return config, nil
+}
+
+func (s Store) SaveShellConfig(config ShellConfig) error {
+	if err := s.Ensure(); err != nil {
+		return err
+	}
+	return s.atomicJSON("shell_config.json", config)
+}
+
 func (s Store) atomicJSON(name string, value any) error {
 	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {

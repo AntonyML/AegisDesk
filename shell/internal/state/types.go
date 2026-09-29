@@ -37,6 +37,7 @@ type State struct {
 	CacheUntil    time.Time
 	Contact       Contact
 	Notices       []Notice
+	Config        *ShellConfig
 	Cached        bool
 	SetupRequired bool
 	Failure       string

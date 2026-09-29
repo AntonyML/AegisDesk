@@ -18,11 +18,12 @@ var EmbeddedPublicKeyID = "ed25519-2026-01"
 var EmbeddedIssuer string
 
 type jwtClaims struct {
-	ProtocolVersion int      `json:"protocol_version"`
-	ServerTime      string   `json:"server_time"`
-	CacheUntil      string   `json:"cache_until"`
-	Contact         Contact  `json:"contact"`
-	Notices         []Notice `json:"notices"`
+	ProtocolVersion int          `json:"protocol_version"`
+	ServerTime      string       `json:"server_time"`
+	CacheUntil      string       `json:"cache_until"`
+	Contact         Contact      `json:"contact"`
+	Notices         []Notice     `json:"notices"`
+	Config          *ShellConfig `json:"config,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -119,5 +120,6 @@ func (v Verifier) Parse(tokenString, installID string) (State, error) {
 		CacheUntil: cacheUntil,
 		Contact:    claims.Contact,
 		Notices:    claims.Notices,
+		Config:     claims.Config,
 	}, nil
 }
