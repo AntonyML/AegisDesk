@@ -13,144 +13,173 @@ on:
         type: boolean
         default: false
 
-permissions:
-  contents: write
+env:
+  INNO_SETUP_VERSION: '6.4.3'
 
 jobs:
-  build-and-release:
-    name: 🚀 Build, Package & Release Shell
+  build:
+    name: Build, sign and attest inputs
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    permissions:
+      contents: read
 
     steps:
-      - name: ⬇️ Checkout Código Fuente
-        uses: actions/checkout@v4
+      - name: Checkout at immutable commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+          ref: ${{ github.sha }}
 
-      - name: 📐 Calcular Próxima Versión Semántica
-        id: semver
+      - name: Resolve version from the triggering ref
+        id: version
         shell: pwsh
         run: |
-          $exactTag = (git tag --points-at HEAD) | Where-Object { $_ -match "^v\d" } | Select-Object -First 1
-          if ($exactTag) {
-            $version = $exactTag.TrimStart('v')
-            $versionTag = $exactTag
+          if ('${{ github.ref_type }}' -eq 'tag') {
+            $version = '${{ github.ref_name }}'.TrimStart('v')
+            if ($version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') { throw "Tag de release inválido: $version" }
           } else {
-            $latestTag = (git tag -l "v*" --sort=-v:refname) | Select-Object -First 1
-            if (-not $latestTag) {
-              $version = "0.1.0"
-            } else {
-              $clean = $latestTag.TrimStart('v')
-              $parts = $clean.Split('.')
-              $major = [int]$parts[0]
-              $minor = [int]$parts[1]
-              $patch = [int]$parts[2]
-
-              $commits = git log "$latestTag..HEAD" --oneline
-              $isMajor = $false
-              $isMinor = $false
-              $hasCommits = $false
-
-              foreach ($c in $commits) {
-                if (-not [string]::IsNullOrWhiteSpace($c)) {
-                  $hasCommits = $true
-                  if ($c -match "(?i)BREAKING CHANGE|breaking:") {
-                    $isMajor = $true
-                  } elseif ($c -match "(?i)feat(\([^\)]+\))?:") {
-                    $isMinor = $true
-                  }
-                }
-              }
-
-              if ($isMajor) {
-                $major++
-                $minor = 0
-                $patch = 0
-              } elseif ($isMinor) {
-                $minor++
-                $patch = 0
-              } elseif ($hasCommits) {
-                $patch++
-              }
-              $version = "$major.$minor.$patch"
-            }
-            $versionTag = "v$version"
+            $version = '0.1.0-dev'
           }
-          Write-Host "✅ Versión calculada: $version (Tag: $versionTag)"
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "version_tag=$versionTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: 🔧 Configurar Go
-        uses: actions/setup-go@v5
+      - name: Set up exact Go toolchain from go.mod
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: shell/go.mod
           cache-dependency-path: shell/go.sum
 
-      - name: 🛠️ Instalar Inno Setup
-        run: choco install innosetup --no-progress
+      - name: Verify canonical legal documents are synchronized
+        shell: pwsh
+        run: node worker/scripts/sync-legal.mjs --check
 
-      - name: 📦 Compilar Binario y Empaquetar Instalador con Inno Setup
+      - name: Install pinned Inno Setup with a required checksum
+        shell: pwsh
+        env:
+          INNO_SETUP_SHA256: ${{ vars.INNO_SETUP_SHA256 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:INNO_SETUP_SHA256)) {
+            throw "TODO: configurar la variable de repositorio INNO_SETUP_SHA256 con el SHA-256 verificado de Inno Setup $env:INNO_SETUP_VERSION antes de publicar."
+          }
+          $installer = Join-Path $env:RUNNER_TEMP "innosetup-$env:INNO_SETUP_VERSION.exe"
+          $url = "https://files.jrsoftware.org/is/6/innosetup-$env:INNO_SETUP_VERSION.exe"
+          Invoke-WebRequest -Uri $url -OutFile $installer
+          $actual = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $env:INNO_SETUP_SHA256.Trim().ToLower()) { throw "Hash de Inno Setup no coincide: $actual" }
+          Start-Process -FilePath $installer -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-' -Wait -NoNewWindow
+
+      - name: Build shell and installer
         shell: pwsh
         working-directory: shell
         env:
           AEGISDESK_STATE_PUBLIC_KEY_BASE64: ${{ vars.AEGISDESK_STATE_PUBLIC_KEY_BASE64 }}
         run: |
-          $ver = "${{ steps.semver.outputs.version }}"
           $publicKey = $env:AEGISDESK_STATE_PUBLIC_KEY_BASE64
-          if ([string]::IsNullOrWhiteSpace($publicKey)) {
-            throw "Falta la variable de repositorio AEGISDESK_STATE_PUBLIC_KEY_BASE64. No se permite publicar un shell sin verificador Ed25519."
-          }
-          $publicKey = $publicKey.Trim()
-          Write-Host "Compilando AegisDesk Shell versión $ver..."
+          if ([string]::IsNullOrWhiteSpace($publicKey)) { throw "Falta AEGISDESK_STATE_PUBLIC_KEY_BASE64; no se publica un shell sin verificador Ed25519." }
           $buildArgs = @{
-            Version = $ver
+            Version = '${{ steps.version.outputs.version }}'
             Installer = $true
-            PublicKeyBase64 = $publicKey
-            RequireVerifier = $true
+            PublicKeyBase64 = $publicKey.Trim()
           }
-          if ("${{ vars.AEGISDESK_WORKER_BASE_URL }}") {
-            $buildArgs["WorkerBaseURL"] = "${{ vars.AEGISDESK_WORKER_BASE_URL }}"
-            $buildArgs["StateIssuer"] = "${{ vars.AEGISDESK_WORKER_BASE_URL }}"
+          if ('${{ vars.AEGISDESK_WORKER_BASE_URL }}') {
+            $buildArgs['WorkerBaseURL'] = '${{ vars.AEGISDESK_WORKER_BASE_URL }}'
+            $buildArgs['StateIssuer'] = '${{ vars.AEGISDESK_WORKER_BASE_URL }}'
           }
           .\build.ps1 @buildArgs
 
-      - name: 📊 Reportar tamaño de artefactos
+      - name: Sign Authenticode artifacts on release tags
+        if: ${{ github.ref_type == 'tag' }}
         shell: pwsh
-        working-directory: shell
+        env:
+          SIGNING_CERT_PFX_BASE64: ${{ secrets.SIGNING_CERT_PFX_BASE64 }}
+          SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
         run: |
-          Get-ChildItem -Path bin/AegisDesk.exe, dist/*.exe | ForEach-Object {
-            "{0} -> {1:N1} MB" -f $_.Name, ($_.Length / 1MB)
+          if ([string]::IsNullOrWhiteSpace($env:SIGNING_CERT_PFX_BASE64) -or [string]::IsNullOrWhiteSpace($env:SIGNING_CERT_PASSWORD)) {
+            throw 'Faltan SIGNING_CERT_PFX_BASE64 o SIGNING_CERT_PASSWORD; una release por tag debe quedar firmada.'
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'aegisdesk-signing.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGNING_CERT_PFX_BASE64))
+          $signtool = Get-ChildItem "$env:ProgramFiles\Windows Kits\10\bin\*\x64\signtool.exe", "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { throw 'No se encontró signtool.exe en el runner.' }
+          Get-ChildItem shell/bin/AegisDesk.exe, shell/dist/*.exe | ForEach-Object {
+            & $signtool.FullName sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 /f $pfx /p $env:SIGNING_CERT_PASSWORD $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Falló la firma de $($_.FullName)" }
+            & $signtool.FullName verify /pa /all $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Falló la verificación Authenticode de $($_.FullName)" }
           }
 
-      - name: 📤 Subir Artefactos al Run
-        uses: actions/upload-artifact@v4
+      - name: Generate SBOM and SHA256SUMS
+        shell: pwsh
+        run: |
+          $releaseDir = Join-Path $env:RUNNER_TEMP 'aegisdesk-release'
+          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+          Copy-Item shell/bin/AegisDesk.exe, shell/dist/*.exe, THIRD_PARTY_NOTICES.md, LICENSE, SECURITY.md $releaseDir -Force
+          $packages = @(go -C shell list -deps -f '{{with .Module}}{{.Path}}|{{.Version}}{{end}}' ./cmd/aegisdesk | Sort-Object -Unique | Where-Object { $_ -and $_ -notmatch '^aegisdesk-shell\|' })
+          $sbomPackages = foreach ($line in $packages) {
+            $parts = $line -split '\|', 2
+            [ordered]@{
+              SPDXID = "SPDXRef-Package-$([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($parts[0])).Replace('=','').Replace('/','_').Replace('+','-'))"
+              name = $parts[0]
+              versionInfo = $parts[1]
+              downloadLocation = 'NOASSERTION'
+              licenseConcluded = 'NOASSERTION'
+              licenseDeclared = 'NOASSERTION'
+            }
+          }
+          [ordered]@{
+            spdxVersion = 'SPDX-2.3'
+            dataLicense = 'CC0-1.0'
+            SPDXID = 'SPDXRef-DOCUMENT'
+            name = 'AegisDesk Go runtime'
+            documentNamespace = "https://aegisdesk.example.invalid/spdx/${{ github.sha }}"
+            creationInfo = [ordered]@{ created = (Get-Date).ToUniversalTime().ToString('o'); creators = @('Tool: AegisDesk release workflow') }
+            packages = @($sbomPackages)
+          } | ConvertTo-Json -Depth 8 | Out-File (Join-Path $releaseDir 'sbom.spdx.json') -Encoding utf8
+          Get-ChildItem $releaseDir -File | Get-FileHash -Algorithm SHA256 | ForEach-Object { '{0}  {1}' -f $_.Hash.ToLower(), (Split-Path $_.Path -Leaf) } | Out-File (Join-Path $releaseDir 'SHA256SUMS') -Encoding ascii
+          "release_dir=$releaseDir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload immutable build bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: AegisDesk-v${{ steps.semver.outputs.version }}-Windows
-          path: |
-            shell/dist/*.exe
-            shell/bin/AegisDesk.exe
+          name: AegisDesk-v${{ steps.version.outputs.version }}-Windows
+          path: ${{ runner.temp }}/aegisdesk-release
           retention-days: 30
 
-      - name: 🚀 Publicar GitHub Release
-        uses: softprops/action-gh-release@v2
+  release:
+    name: Publish verified release
+    if: ${{ github.ref_type == 'tag' }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Download immutable build bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          tag_name: ${{ steps.semver.outputs.version_tag }}
-          name: Release ${{ steps.semver.outputs.version_tag }}
-          body: |
-            ## 📦 Artefactos Oficiales de AegisDesk
+          name: AegisDesk-v${{ needs.build.outputs.version }}-Windows
+          path: release
 
-            | Archivo | Tipo | Descripción |
-            | :--- | :--- | :--- |
-            | **`AegisDesk-Setup-v${{ steps.semver.outputs.version }}.exe`** | **Instalador Oficial (Inno Setup)** | **Recomendado para Terminales.** Asistente guiado de instalación, configuración inicial, acceso directo en Escritorio y desinstalador limpio. |
-            | **`AegisDesk.exe`** | **Binario Portable** | Ejecutable de escritorio independiente. |
+      - name: Attest release artifacts
+        id: attest
+        uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd # v2.3.0
+        with:
+          subject-path: 'release/*.exe'
 
-            ---
-            *Desarrollado para el ecosistema Aegis.*
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           files: |
-            shell/dist/*.exe
-            shell/bin/AegisDesk.exe
+            release/*
+            ${{ steps.attest.outputs.bundle-path }}
           draft: false
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
