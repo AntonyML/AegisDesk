@@ -87,20 +87,73 @@ queryAll('dialog').forEach((dialog) => dialog.addEventListener('click', (event) 
 }));
 
 const equipmentDialog = query('#equipment-dialog');
+const equipmentForm = query('#equipment-form');
+const equipmentOrganization = query('#equipment-organization');
+const equipmentGroup = query('#equipment-group');
+const equipmentUser = query('#equipment-user');
+let selectedEquipmentId = '';
+
+function localInputValue(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part) => String(part).padStart(2, '0');
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+}
+
+function syncEquipmentAssignments() {
+  const organizationId = equipmentOrganization?.value || '';
+  const groupId = equipmentGroup?.value || '';
+  if (equipmentGroup) {
+    Array.from(equipmentGroup.options).forEach((option) => {
+      const visible = !option.value || option.dataset.organizationId === organizationId;
+      option.hidden = !visible;
+      option.disabled = !visible;
+    });
+    if (groupId && equipmentGroup.selectedOptions[0]?.disabled) equipmentGroup.value = '';
+  }
+  if (equipmentUser) {
+    Array.from(equipmentUser.options).forEach((option) => {
+      const sameOrganization = !option.value || option.dataset.organizationId === organizationId;
+      const sameGroup = !groupId || !option.dataset.groupId || option.dataset.groupId === groupId;
+      option.hidden = !(sameOrganization && sameGroup);
+      option.disabled = !(sameOrganization && sameGroup);
+    });
+    if (equipmentUser.value && equipmentUser.selectedOptions[0]?.disabled) equipmentUser.value = '';
+  }
+}
+
+equipmentOrganization?.addEventListener('change', syncEquipmentAssignments);
+equipmentGroup?.addEventListener('change', syncEquipmentAssignments);
 queryAll('[data-equipment-open]').forEach((button) => button.addEventListener('click', (event) => {
   const item = event.currentTarget.dataset;
+  selectedEquipmentId = item.equipmentId || '';
   const values = {
     '#equipment-detail-name': item.equipmentName,
     '#equipment-detail-id': item.equipmentId,
-    '#equipment-detail-status': item.equipmentStatusLabel,
     '#equipment-detail-last-opened': item.equipmentLastOpened,
-    '#equipment-detail-cycle': item.equipmentCycle,
     '#equipment-detail-versions': item.equipmentVersions,
+    '#equipment-detail-sidc-target': item.equipmentSidcTarget,
+    '#equipment-detail-assignment': [item.equipmentOrgId, item.equipmentGroupId, item.equipmentUserId].filter(Boolean).length ? 'Asignación configurada' : 'Sin asignación',
   };
   Object.entries(values).forEach(([selector, value]) => {
     const element = query(selector);
     if (element) element.textContent = value || '—';
   });
+  const setValue = (selector, value) => { const element = query(selector); if (element) element.value = value || ''; };
+  setValue('#equipment-id', item.equipmentId);
+  setValue('#equipment-cycle-id', item.equipmentCycleId);
+  setValue('#equipment-name', item.equipmentName);
+  setValue('#equipment-status', item.equipmentStatus || 'active');
+  setValue('#equipment-expires', localInputValue(item.equipmentDueAt));
+  setValue('#equipment-organization', item.equipmentOrgId);
+  syncEquipmentAssignments();
+  setValue('#equipment-group', item.equipmentGroupId);
+  syncEquipmentAssignments();
+  setValue('#equipment-user', item.equipmentUserId);
+  setValue('#equipment-reason', 'Cambio realizado desde el panel');
+  const feedback = query('#equipment-feedback');
+  if (feedback) feedback.textContent = '';
   const copy = query('[data-equipment-copy]', equipmentDialog);
   if (copy) copy.dataset.copyValue = item.equipmentId || '';
   equipmentDialog?.showModal();
@@ -111,53 +164,125 @@ queryAll('[data-equipment-copy]').forEach((button) => button.addEventListener('c
   if (value) copyText(value, 'Identificador copiado.');
 }));
 
-async function submitEquipmentAction(button, action) {
-  setBusy(button, true, 'Guardando…');
+equipmentForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const submit = query('button[type=submit]', form);
+  const feedback = query('#equipment-feedback');
+  const values = Object.fromEntries(new FormData(form).entries());
+  const status = values.status;
+  if ((status === 'disabled' || status === 'revoked') && !window.confirm('¿Confirmás este cambio? El equipo recibirá una política que puede impedir abrir SIDC.')) return;
+  setBusy(submit, true, 'Guardando…');
+  if (feedback) feedback.textContent = 'Guardando cambios…';
   try {
-    await action();
-    showToast('Cambios guardados.', 'success');
-    window.setTimeout(() => window.location.reload(), 500);
+    await requestJson('/api/v1/admin/installations/' + encodeURIComponent(values.id), {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status, equipment_name: values.equipment_name, organization_id: values.organization_id || null, group_id: values.group_id || null, assigned_user_id: values.assigned_user_id || null, reason: values.reason }),
+    });
+    if (values.cycle_id && values.due_at) {
+      const dueAt = new Date(values.due_at);
+      if (Number.isNaN(dueAt.getTime())) throw new Error('La fecha de vencimiento no es válida.');
+      await requestJson('/api/v1/admin/cycles/' + encodeURIComponent(values.cycle_id), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ due_at: dueAt.toISOString(), reason: values.reason }),
+      });
+    }
+    if (feedback) feedback.textContent = 'Guardado correctamente.';
+    showToast('Equipo actualizado.', 'success');
+    window.setTimeout(() => window.location.reload(), 650);
   } catch (error) {
-    setBusy(button, false);
+    setBusy(submit, false);
+    if (feedback) feedback.textContent = error.message;
     showToast(error.message, 'error');
   }
-}
+});
 
 queryAll('[data-revoke]').forEach((button) => button.addEventListener('click', (event) => {
   const current = event.currentTarget;
   const id = current.dataset.revoke;
   if (!id || !window.confirm('¿Revocar esta instalación? Esta acción puede impedir nuevas aperturas.')) return;
-  submitEquipmentAction(current, () => requestJson('/api/v1/admin/installations/' + encodeURIComponent(id) + '/revoke', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ reason: 'Revocación solicitada desde el panel' }),
-  }));
+  requestJson('/api/v1/admin/installations/' + encodeURIComponent(id), { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'revoked', reason: 'Revocación solicitada desde el panel' }) }).then(() => window.location.reload()).catch((error) => showToast(error.message, 'error'));
 }));
 
-queryAll('[data-renew]').forEach((button) => button.addEventListener('click', (event) => {
-  const current = event.currentTarget;
-  const id = current.dataset.renew;
-  const reason = id ? window.prompt('Motivo de la renovación:') : null;
-  if (!id || !reason?.trim()) return;
-  submitEquipmentAction(current, () => requestJson('/api/v1/admin/cycles/' + encodeURIComponent(id) + '/renew', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ reason: reason.trim() }),
-  }));
+function formPayload(form) {
+  const values = Object.fromEntries(new FormData(form).entries());
+  delete values.id;
+  if (values.email === '') values.email = null;
+  if (values.group_id === '') values.group_id = null;
+  return values;
+}
+
+queryAll('[data-directory-edit]').forEach((button) => button.addEventListener('click', (event) => {
+  const item = event.currentTarget.dataset;
+  const form = query('[data-directory-form="' + item.directoryEdit + '"]');
+  if (!form) return;
+  form.elements.id.value = item.directoryId || '';
+  form.elements.name && (form.elements.name.value = item.directoryName || '');
+  form.elements.display_name && (form.elements.display_name.value = item.directoryName || '');
+  form.elements.email && (form.elements.email.value = item.directoryEmail || '');
+  form.elements.status && (form.elements.status.value = item.directoryStatus || 'active');
+  form.elements.organization_id && (form.elements.organization_id.value = item.directoryOrganizationId || '');
+  form.elements.group_id && (form.elements.group_id.value = item.directoryGroupId || '');
+  form.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }));
 
-queryAll('[data-adjust]').forEach((button) => button.addEventListener('click', (event) => {
-  const current = event.currentTarget;
-  const id = current.dataset.adjust;
-  const dueAt = id ? window.prompt('Nueva fecha de vencimiento (ISO 8601 UTC):') : null;
-  const reason = dueAt ? window.prompt('Motivo del ajuste:') : null;
-  if (!id || !dueAt || !reason?.trim()) return;
-  submitEquipmentAction(current, () => requestJson('/api/v1/admin/cycles/' + encodeURIComponent(id), {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ due_at: dueAt, reason: reason.trim() }),
-  }));
+queryAll('[data-directory-reset]').forEach((button) => button.addEventListener('click', (event) => {
+  const form = query('[data-directory-form="' + event.currentTarget.dataset.directoryReset + '"]');
+  form?.reset();
+  if (form?.elements.id) form.elements.id.value = '';
 }));
+
+queryAll('[data-directory-form]').forEach((form) => form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const type = form.dataset.directoryForm;
+  const id = form.elements.id?.value;
+  const submit = query('button[type=submit]', form);
+  setBusy(submit, true, 'Guardando…');
+  try {
+    const path = type === 'organization' ? 'organizations' : type === 'group' ? 'groups' : 'managed-users';
+    await requestJson('/api/v1/admin/' + path + (id ? '/' + encodeURIComponent(id) : ''), { method: id ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(formPayload(form)) });
+    showToast('Cambio guardado.', 'success');
+    window.setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    setBusy(submit, false);
+    showToast(error.message, 'error');
+  }
+}));
+
+const supportForm = query('#support-form');
+const supportFeedback = query('#support-feedback');
+async function loadSupportForm() {
+  if (!supportForm) return;
+  try {
+    const body = await requestJson('/api/v1/admin/support-config');
+    const config = body.support_config;
+    if (!config) return;
+    Object.entries({ title: config.title, message: config.message, notice: config.notice, area_name: config.areaName, contact_email: config.contactEmail, contact_phone: config.contactPhone, hours: config.hours, ticket_url: config.ticketUrl, docs_url: config.docsUrl }).forEach(([name, value]) => { if (supportForm.elements[name]) supportForm.elements[name].value = value || ''; });
+  } catch { /* La edición sigue disponible con valores por defecto. */ }
+}
+loadSupportForm();
+supportForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const submit = query('button[type=submit]', supportForm);
+  setBusy(submit, true, 'Guardando…');
+  if (supportFeedback) supportFeedback.textContent = 'Guardando cambios…';
+  try {
+    const values = formPayload(supportForm);
+    if (values.contact_email === '') values.contact_email = null;
+    if (values.contact_phone === '') values.contact_phone = null;
+    if (values.ticket_url === '') values.ticket_url = null;
+    if (values.docs_url === '') values.docs_url = null;
+    await requestJson('/api/v1/admin/support-config', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(values) });
+    if (supportFeedback) supportFeedback.textContent = 'Guardado correctamente.';
+    showToast('Soporte remoto actualizado.', 'success');
+  } catch (error) {
+    setBusy(submit, false);
+    if (supportFeedback) supportFeedback.textContent = error.message;
+    showToast(error.message, 'error');
+  }
+});
 
 const ticketRows = queryAll('[data-ticket-row]');
 const ticketSearch = query('#ticket-search');

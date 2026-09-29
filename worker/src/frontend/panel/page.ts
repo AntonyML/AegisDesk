@@ -11,7 +11,12 @@ import {
 } from "./format";
 import { panelScript } from "./script";
 import { panelStyles } from "./styles";
-import type { PanelEvent, PanelInstallation, PanelTicket } from "./types";
+import type {
+  PanelAdminData,
+  PanelEvent,
+  PanelInstallation,
+  PanelTicket,
+} from "./types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -19,6 +24,7 @@ export function panelPage(
   installations: PanelInstallation[],
   tickets: PanelTicket[],
   events: PanelEvent[],
+  admin: PanelAdminData = { organizations: [], groups: [], managedUsers: [] },
 ) {
   const now = Date.now();
   const activeInstallations = installations.filter(
@@ -48,15 +54,11 @@ export function panelPage(
       : "Nunca";
     const cycle = cycleLabel(item.dueAt);
     const versions = `Shell ${item.shellVersion} · SIDC ${item.sidcVersion}`;
-    const cycleActions =
-      item.status === "active" && item.cycleId
-        ? html`<button type="button" data-renew="${item.cycleId}">Renovar ciclo</button><button type="button" data-adjust="${item.cycleId}">Ajustar fecha</button>`
-        : html`<span class="muted">Sin acciones disponibles</span>`;
-
     return html`<tr>
       <td data-label="Equipo">
         <span class="table-primary">${item.equipmentName}</span>
         <span class="table-secondary">${truncateId(item.id)} · ${versions}</span>
+        <span class="table-secondary">${item.organizationName ?? "Sin organización"} · ${item.groupName ?? "Sin grupo"}</span>
       </td>
       <td data-label="Estado"><span class="status-badge ${statusTone(item.status)}">${statusLabel(item.status)}</span></td>
       <td data-label="Última conexión" class="nowrap">${lastOpened}</td>
@@ -68,11 +70,17 @@ export function panelPage(
             <button type="button" data-equipment-open
               data-equipment-name="${item.equipmentName}"
               data-equipment-id="${item.id}"
+              data-equipment-status="${item.status}"
               data-equipment-status-label="${statusLabel(item.status)}"
               data-equipment-last-opened="${lastOpened}"
               data-equipment-cycle="${cycle}"
-              data-equipment-versions="${versions}">Ver detalle</button>
-            ${cycleActions}
+              data-equipment-cycle-id="${item.cycleId ?? ""}"
+              data-equipment-due-at="${item.dueAt ?? ""}"
+              data-equipment-versions="${versions}"
+              data-equipment-org-id="${item.organizationId ?? ""}"
+              data-equipment-group-id="${item.groupId ?? ""}"
+              data-equipment-user-id="${item.assignedUserId ?? ""}"
+              data-equipment-sidc-target="${item.sidcTarget}">Ver / administrar</button>
             <button type="button" data-equipment-copy data-copy-value="${item.id}">Copiar identificador</button>
             ${item.status === "active" ? html`<button type="button" class="danger" data-revoke="${item.id}">Revocar instalación</button>` : ""}
           </div>
@@ -80,6 +88,19 @@ export function panelPage(
       </td>
     </tr>`;
   });
+
+  const organizationOptions = admin.organizations.map(
+    (organization) =>
+      html`<option value="${organization.id}">${organization.name}</option>`,
+  );
+  const groupOptions = admin.groups.map(
+    (group) =>
+      html`<option value="${group.id}" data-organization-id="${group.organizationId}">${group.name}</option>`,
+  );
+  const managedUserOptions = admin.managedUsers.map(
+    (user) =>
+      html`<option value="${user.id}" data-organization-id="${user.organizationId}" data-group-id="${user.groupId ?? ""}">${user.displayName}${user.email ? ` · ${user.email}` : ""}</option>`,
+  );
 
   const ticketRows = tickets.map((ticket) => {
     const searchText =
@@ -123,6 +144,7 @@ export function panelPage(
           <a href="#overview">Resumen</a>
           <a href="#activity">Actividad</a>
           <a href="#tickets">Tickets</a>
+          <a href="#administration">Administración</a>
           <button type="button" id="new-code" class="button primary">Generar código</button>
         </nav>
       </header>
@@ -175,6 +197,56 @@ export function panelPage(
             </div>
             ${tickets.length > 0 ? html`<div class="table-wrap"><table class="data-table"><thead><tr><th>Ticket</th><th>Solicitante</th><th>Creado</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${ticketRows}</tbody></table><div id="ticket-filter-empty" class="table-empty" hidden>No hay tickets que coincidan con los filtros.</div></div>` : html`<div class="table-empty">No hay tickets registrados.</div>`}
           </section>
+
+          <section class="surface full-width" id="administration" aria-labelledby="administration-heading">
+            <div class="section-heading"><div><h2 id="administration-heading">Administración</h2><p>Organizaciones, grupos, usuarios asignados y soporte remoto.</p></div><span class="muted">Cambios protegidos por Cloudflare Access</span></div>
+            <div class="admin-grid">
+              <article class="admin-card">
+                <h3>Organizaciones</h3>
+                <form id="organization-form" data-directory-form="organization">
+                  <input type="hidden" name="id" />
+                  <div class="form-field"><label for="organization-name">Nombre</label><input class="field" id="organization-name" name="name" maxlength="128" required /></div>
+                  <div class="form-field"><label for="organization-status">Estado</label><select class="field" id="organization-status" name="status"><option value="active">Activa</option><option value="disabled">Desactivada</option></select></div>
+                  <div class="form-actions"><button type="submit" class="button primary">Guardar organización</button><button type="button" class="button" data-directory-reset="organization">Limpiar</button></div>
+                </form>
+                <ul class="admin-list">${admin.organizations.map((organization) => html`<li><span><strong>${organization.name}</strong><small>${organization.status === "active" ? "Activa" : "Desactivada"}</small></span><button type="button" class="button small" data-directory-edit="organization" data-directory-id="${organization.id}" data-directory-name="${organization.name}" data-directory-status="${organization.status}">Editar</button></li>`)}</ul>
+              </article>
+              <article class="admin-card">
+                <h3>Grupos</h3>
+                <form id="group-form" data-directory-form="group">
+                  <input type="hidden" name="id" />
+                  <div class="form-field"><label for="group-name">Nombre</label><input class="field" id="group-name" name="name" maxlength="128" required /></div>
+                  <div class="form-field"><label for="group-organization">Organización</label><select class="field" id="group-organization" name="organization_id" required><option value="">Seleccioná una organización</option>${organizationOptions}</select></div>
+                  <div class="form-field"><label for="group-status">Estado</label><select class="field" id="group-status" name="status"><option value="active">Activo</option><option value="disabled">Desactivado</option></select></div>
+                  <div class="form-actions"><button type="submit" class="button primary">Guardar grupo</button><button type="button" class="button" data-directory-reset="group">Limpiar</button></div>
+                </form>
+                <ul class="admin-list">${admin.groups.map((group) => html`<li><span><strong>${group.name}</strong><small>${admin.organizations.find((item) => item.id === group.organizationId)?.name ?? "Sin organización"}</small></span><button type="button" class="button small" data-directory-edit="group" data-directory-id="${group.id}" data-directory-name="${group.name}" data-directory-status="${group.status}" data-directory-organization-id="${group.organizationId}">Editar</button></li>`)}</ul>
+              </article>
+              <article class="admin-card">
+                <h3>Usuarios administrados</h3>
+                <form id="managed-user-form" data-directory-form="managed-user">
+                  <input type="hidden" name="id" />
+                  <div class="form-field"><label for="managed-user-name">Nombre</label><input class="field" id="managed-user-name" name="display_name" maxlength="128" required /></div>
+                  <div class="form-field"><label for="managed-user-email">Correo (opcional)</label><input class="field" id="managed-user-email" name="email" type="email" maxlength="320" /></div>
+                  <div class="form-field"><label for="managed-user-organization">Organización</label><select class="field" id="managed-user-organization" name="organization_id" required><option value="">Seleccioná una organización</option>${organizationOptions}</select></div>
+                  <div class="form-field"><label for="managed-user-group">Grupo (opcional)</label><select class="field" id="managed-user-group" name="group_id"><option value="">Sin grupo</option>${groupOptions}</select></div>
+                  <div class="form-field"><label for="managed-user-status">Estado</label><select class="field" id="managed-user-status" name="status"><option value="active">Activo</option><option value="disabled">Desactivado</option></select></div>
+                  <div class="form-actions"><button type="submit" class="button primary">Guardar usuario</button><button type="button" class="button" data-directory-reset="managed-user">Limpiar</button></div>
+                </form>
+                <ul class="admin-list">${admin.managedUsers.map((user) => html`<li><span><strong>${user.displayName}</strong><small>${admin.organizations.find((item) => item.id === user.organizationId)?.name ?? "Sin organización"}${user.email ? ` · ${user.email}` : ""}</small></span><button type="button" class="button small" data-directory-edit="managed-user" data-directory-id="${user.id}" data-directory-name="${user.displayName}" data-directory-email="${user.email ?? ""}" data-directory-status="${user.status}" data-directory-organization-id="${user.organizationId}" data-directory-group-id="${user.groupId ?? ""}">Editar</button></li>`)}</ul>
+              </article>
+              <article class="admin-card admin-card-wide">
+                <h3>Soporte remoto global</h3>
+                <p class="form-help">El Shell recibirá esta información como configuración estructurada. Solo se aceptan texto plano y enlaces HTTPS.</p>
+                <form id="support-form" data-support-form>
+                  <div class="form-grid"><div class="form-field"><label for="support-title">Título</label><input class="field" id="support-title" name="title" maxlength="128" required value="${admin.support?.title ?? "Soporte AegisDesk"}" /></div><div class="form-field"><label for="support-area">Área responsable</label><input class="field" id="support-area" name="area_name" maxlength="128" value="${admin.support?.areaName ?? ""}" /></div><div class="form-field"><label for="support-email">Correo</label><input class="field" id="support-email" name="contact_email" type="email" maxlength="320" value="${admin.support?.contactEmail ?? ""}" /></div><div class="form-field"><label for="support-phone">Teléfono</label><input class="field" id="support-phone" name="contact_phone" maxlength="32" value="${admin.support?.contactPhone ?? ""}" /></div><div class="form-field"><label for="support-hours">Horarios</label><input class="field" id="support-hours" name="hours" maxlength="256" value="${admin.support?.hours ?? ""}" /></div><div class="form-field"><label for="support-ticket-url">URL de tickets</label><input class="field" id="support-ticket-url" name="ticket_url" type="url" placeholder="https://…" value="${admin.support?.ticketUrl ?? ""}" /></div><div class="form-field"><label for="support-docs-url">URL de documentación</label><input class="field" id="support-docs-url" name="docs_url" type="url" placeholder="https://…" value="${admin.support?.docsUrl ?? ""}" /></div></div>
+                  <div class="form-field"><label for="support-message">Descripción</label><textarea class="field" id="support-message" name="message" maxlength="2000" rows="3" required>${admin.support?.message ?? ""}</textarea></div>
+                  <div class="form-field"><label for="support-notice">Aviso temporal</label><textarea class="field" id="support-notice" name="notice" maxlength="1000" rows="2">${admin.support?.notice ?? ""}</textarea></div>
+                  <div class="form-actions"><span id="support-feedback" class="drawer-feedback" role="status"></span><button type="submit" class="button primary">Guardar soporte</button></div>
+                </form>
+              </article>
+            </div>
+          </section>
         </div>
       </main>
 
@@ -206,9 +278,14 @@ export function panelPage(
 
       <dialog id="equipment-dialog" data-close-on-backdrop>
         <div class="dialog-content">
-          <div class="dialog-header"><div><p class="eyebrow">Detalle del equipo</p><h2 id="equipment-detail-name">Equipo</h2></div><button type="button" class="dialog-close" data-dialog-close="equipment-dialog" aria-label="Cerrar">×</button></div>
-          <dl class="equipment-detail"><div><dt>Identificador</dt><dd id="equipment-detail-id">—</dd></div><div><dt>Estado</dt><dd id="equipment-detail-status">—</dd></div><div><dt>Última conexión</dt><dd id="equipment-detail-last-opened">—</dd></div><div><dt>Ciclo</dt><dd id="equipment-detail-cycle">—</dd></div><div><dt>Versiones</dt><dd id="equipment-detail-versions">—</dd></div></dl>
-          <div class="dialog-actions"><button type="button" class="button" data-equipment-copy>Copiar identificador</button><button type="button" class="button primary" data-dialog-close="equipment-dialog">Listo</button></div>
+          <div class="dialog-header"><div><p class="eyebrow">Administración de equipo</p><h2 id="equipment-detail-name">Equipo</h2><p id="equipment-detail-id" class="muted">—</p></div><button type="button" class="dialog-close" data-dialog-close="equipment-dialog" aria-label="Cerrar">×</button></div>
+          <form id="equipment-form">
+            <input type="hidden" id="equipment-id" name="id" /><input type="hidden" id="equipment-cycle-id" name="cycle_id" />
+            <div class="form-grid"><div class="form-field"><label for="equipment-name">Nombre visible</label><input class="field" id="equipment-name" name="equipment_name" maxlength="128" required /></div><div class="form-field"><label for="equipment-status">Estado administrativo</label><select class="field" id="equipment-status" name="status"><option value="active">Activo</option><option value="disabled">Desactivado</option><option value="revoked">Revocado</option></select></div><div class="form-field"><label for="equipment-expires">Vencimiento del ciclo <span class="form-help">(hora local, se guarda en UTC)</span></label><input class="field" id="equipment-expires" name="due_at" type="datetime-local" /></div><div class="form-field"><label for="equipment-organization">Organización</label><select class="field" id="equipment-organization" name="organization_id"><option value="">Sin organización</option>${organizationOptions}</select></div><div class="form-field"><label for="equipment-group">Grupo</label><select class="field" id="equipment-group" name="group_id"><option value="">Sin grupo</option>${groupOptions}</select></div><div class="form-field"><label for="equipment-user">Usuario asignado</label><select class="field" id="equipment-user" name="assigned_user_id"><option value="">Sin usuario</option>${managedUserOptions}</select></div></div>
+            <dl class="equipment-detail"><div><dt>Última conexión</dt><dd id="equipment-detail-last-opened">—</dd></div><div><dt>Versiones</dt><dd id="equipment-detail-versions">—</dd></div><div><dt>Ruta SIDC registrada</dt><dd id="equipment-detail-sidc-target">—</dd></div><div><dt>Asignación actual</dt><dd id="equipment-detail-assignment">—</dd></div></dl>
+            <div class="form-field"><label for="equipment-reason">Motivo del cambio</label><input class="field" id="equipment-reason" name="reason" maxlength="512" required value="Cambio realizado desde el panel" /></div>
+            <div class="dialog-actions"><button type="button" class="button" data-equipment-copy>Copiar identificador</button><span id="equipment-feedback" class="drawer-feedback" role="status"></span><button type="button" class="button" data-dialog-close="equipment-dialog">Cancelar</button><button type="submit" class="button primary">Guardar cambios</button></div>
+          </form>
         </div>
       </dialog>
 

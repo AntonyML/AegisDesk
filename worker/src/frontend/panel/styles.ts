@@ -92,9 +92,9 @@ h3 { margin-bottom: 4px; font-size: 15px; }
 .button.small { min-height: 34px; padding: 6px 10px; font-size: 13px; }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
-.kpi { min-height: 116px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); }
+.kpi { display: flex; min-height: 116px; flex-direction: column; align-items: flex-start; gap: 6px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); }
 .kpi-label { color: var(--muted); font-size: 13px; font-weight: 650; }
-.kpi-value { margin: 12px 0 4px; font-size: 30px; font-weight: 780; letter-spacing: -.05em; }
+.kpi-value { display: block; margin: 2px 0 0; font-size: 30px; font-weight: 780; line-height: 1.05; letter-spacing: -.05em; }
 .kpi-help { color: var(--muted); font-size: 12px; }
 
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(290px, 1fr); gap: 16px; align-items: start; }
@@ -104,6 +104,7 @@ h3 { margin-bottom: 4px; font-size: 15px; }
 .section-link { display: inline-flex; align-items: center; min-height: 36px; font-size: 13px; font-weight: 700; text-decoration: none; }
 
 .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table-wrap { overflow-x: auto; }
 .data-table th { padding: 0 12px 11px; color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .06em; text-align: left; text-transform: uppercase; }
 .data-table td { padding: 15px 12px; border-top: 1px solid var(--border); vertical-align: middle; }
 .data-table th:first-child, .data-table td:first-child { padding-left: 0; }
@@ -170,6 +171,17 @@ dialog::backdrop { background: rgba(10, 14, 28, .48); }
 .form-field { display: grid; gap: 7px; margin-bottom: 18px; }
 .form-field label { font-size: 13px; font-weight: 700; }
 .form-help { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+.form-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.admin-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.admin-card { min-width: 0; padding: 18px; background: #fbfcfe; border: 1px solid var(--border); border-radius: 6px; }
+.admin-card h3 { margin-bottom: 16px; }
+.admin-card-wide { grid-column: 1 / -1; }
+.admin-list { display: grid; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
+.admin-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.admin-list li span { min-width: 0; display: grid; gap: 3px; }
+.admin-list strong, .admin-list small { overflow-wrap: anywhere; }
+.admin-list small { color: var(--muted); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 .code-result { display: none; padding: 16px; background: #f2fff7; border: 1px solid #b5eac9; border-radius: 6px; }
 .code-result.is-visible { display: block; }
@@ -197,6 +209,7 @@ dialog::backdrop { background: rgba(10, 14, 28, .48); }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .overview-grid { grid-template-columns: 1fr; }
   .activity-surface { min-height: 0; }
+  .admin-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 700px) {
   .app-header { align-items: flex-start; flex-direction: column; gap: 10px; padding: 14px 18px; }
@@ -222,9 +235,24 @@ dialog::backdrop { background: rgba(10, 14, 28, .48); }
   .search-field { width: 100%; }
   .ticket-results { align-self: flex-end; }
   .equipment-detail { grid-template-columns: 1fr; }
+  .form-grid, .admin-grid { grid-template-columns: 1fr; }
+  .admin-card-wide { grid-column: auto; }
   .drawer { padding: 20px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
+@media print {
+  @page { margin: 12mm; }
+  :root { color-scheme: light; }
+  body { background: white; }
+  .app-header, .button, .action-menu, .ticket-toolbar, dialog, .drawer, .drawer-backdrop, .toast, .admin-grid { display: none !important; }
+  .page { max-width: none; padding: 0; }
+  .surface { box-shadow: none; break-inside: avoid; }
+  .overview-grid { display: block; }
+  .overview-grid > .surface { margin: 0 0 12px; }
+  .full-width { margin-top: 0; }
+  .data-table { font-size: 10px; }
+  .data-table td { padding: 7px 5px; }
 }
 `;

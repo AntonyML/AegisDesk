@@ -31,6 +31,7 @@ export function truncateId(value: string, length = 8): string {
 export function statusLabel(value: string): string {
   const labels: Record<string, string> = {
     active: "Activo",
+    disabled: "Desactivado",
     revoked: "Revocado",
     open: "Abierto",
     in_progress: "En progreso",
@@ -42,6 +43,7 @@ export function statusLabel(value: string): string {
 
 export function statusTone(value: string): string {
   if (value === "active" || value === "resolved") return "positive";
+  if (value === "disabled") return "warning";
   if (value === "revoked" || value === "spam") return "negative";
   if (value === "in_progress") return "warning";
   return "neutral";
