@@ -16,10 +16,11 @@ type StateLogger interface {
 }
 
 type Client struct {
-	HTTP     *http.Client
-	Store    Store
-	Verifier Verifier
-	Timeout  time.Duration
+	HTTP             *http.Client
+	Store            Store
+	Verifier         Verifier
+	Timeout          time.Duration
+	AllowUnsignedDev bool
 }
 
 func NewClient(store Store, verifier Verifier) Client {
@@ -29,6 +30,12 @@ func NewClient(store Store, verifier Verifier) Client {
 		Verifier: verifier,
 		Timeout:  3 * time.Second,
 	}
+}
+
+func NewClientWithOptions(store Store, verifier Verifier, allowUnsignedDev bool) Client {
+	client := NewClient(store, verifier)
+	client.AllowUnsignedDev = allowUnsignedDev
+	return client
 }
 
 func (c Client) Enroll(ctx context.Context, baseURL, code string, request map[string]any) (Config, error) {
@@ -80,23 +87,38 @@ func (c Client) FetchShellConfig(ctx context.Context, config Config, cachedRevis
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return ShellConfig{}, false, fmt.Errorf("decode shell config: %w", err)
 	}
-	cfg := envelope.Config
+	if envelope.ConfigToken == "" {
+		return ShellConfig{}, false, fmt.Errorf("signed shell config token is missing")
+	}
+	var signed State
+	var verifyErr error
+	if c.AllowUnsignedDev {
+		signed, verifyErr = c.Verifier.ParseUnsignedDev(envelope.ConfigToken, config.InstallID)
+	} else {
+		signed, verifyErr = c.Verifier.Parse(envelope.ConfigToken, config.InstallID)
+	}
+	if verifyErr != nil {
+		return ShellConfig{}, false, fmt.Errorf("verify config token: %w", verifyErr)
+	}
+	if signed.Config == nil {
+		return ShellConfig{}, false, fmt.Errorf("signed shell config is missing")
+	}
+	cfg := *signed.Config
+	cfg.Policy = signed.Policy
 	if err := cfg.Validate(config.InstallID); err != nil {
 		return ShellConfig{}, false, fmt.Errorf("invalid shell config: %w", err)
-	}
-	if envelope.ConfigToken != "" && c.Verifier.Issuer != "" && len(c.Verifier.Keys) > 0 {
-		if _, verifyErr := c.Verifier.Parse(envelope.ConfigToken, config.InstallID); verifyErr != nil {
-			return ShellConfig{}, false, fmt.Errorf("verify config token: %w", verifyErr)
-		}
 	}
 	return cfg, true, nil
 }
 
 func (c Client) ResolveEffectiveConfig(ctx context.Context, config Config, shellVersion, sidcVersion string, logger StateLogger) (ShellConfig, bool) {
+	now := c.Store.EffectiveNow(time.Now().UTC())
 	cached, cacheErr := c.Store.LoadShellConfig()
 	cachedRevision := ""
 	hasCache := cacheErr == nil && cached.Validate(config.InstallID) == nil
 	if hasCache {
+		cached.Policy = cached.Policy.WithDefaults(configTime(cached, now))
+		cached.CacheState = cached.Policy.CacheDisposition(now, now)
 		cachedRevision = cached.Revision
 	}
 
@@ -107,6 +129,16 @@ func (c Client) ResolveEffectiveConfig(ctx context.Context, config Config, shell
 	fetched, modified, err := c.FetchShellConfig(ctx, config, cachedRevision)
 	if err == nil {
 		if modified {
+			fetched.CacheState = fetched.Policy.CacheDisposition(now, now)
+			if fetched.CacheState == CacheExpired {
+				return c.expiredConfig(config, shellVersion, sidcVersion, logger), true
+			}
+			if acceptErr := c.Store.AcceptPolicy("config", fetched.Policy, configTime(fetched, now)); acceptErr != nil {
+				if logger != nil {
+					logger.Printf("config rejected: %v", acceptErr)
+				}
+				return c.cachedOrUnavailable(config, shellVersion, sidcVersion, cached, hasCache, now, logger)
+			}
 			if saveErr := c.Store.SaveShellConfig(fetched); saveErr != nil && logger != nil {
 				logger.Printf("failed to save shell config cache: %v", saveErr)
 			}
@@ -116,8 +148,12 @@ func (c Client) ResolveEffectiveConfig(ctx context.Context, config Config, shell
 			return fetched, false
 		}
 		if hasCache {
+			cached.CacheState = cached.Policy.CacheDisposition(now, now)
 			if logger != nil {
 				logger.Printf("config not modified")
+			}
+			if cached.CacheState == CacheExpired {
+				return c.expiredConfig(config, shellVersion, sidcVersion, logger), true
 			}
 			return cached, false
 		}
@@ -126,10 +162,17 @@ func (c Client) ResolveEffectiveConfig(ctx context.Context, config Config, shell
 	}
 
 	if hasCache {
+		cached.CacheState = cached.Policy.CacheDisposition(now, now)
+		if cached.CacheState == CacheExpired {
+			return c.expiredConfig(config, shellVersion, sidcVersion, logger), true
+		}
 		if logger != nil {
 			logger.Printf("offline fallback: using cached configuration (status: %s)", cached.Installation.Status)
 		}
 		return cached, true
+	}
+	if c.Store.HasSuccessfulConfigSync() {
+		return c.expiredConfig(config, shellVersion, sidcVersion, logger), true
 	}
 
 	fallback := DefaultShellConfig(config, shellVersion, sidcVersion)
@@ -137,6 +180,24 @@ func (c Client) ResolveEffectiveConfig(ctx context.Context, config Config, shell
 		logger.Printf("cache fallback: using packaged defaults (status: %s)", fallback.Installation.Status)
 	}
 	return fallback, true
+}
+
+func (c Client) cachedOrUnavailable(config Config, shellVersion, sidcVersion string, cached ShellConfig, hasCache bool, now time.Time, logger StateLogger) (ShellConfig, bool) {
+	if hasCache {
+		cached.CacheState = cached.Policy.CacheDisposition(now, now)
+		if cached.CacheState == CacheExpired {
+			return c.expiredConfig(config, shellVersion, sidcVersion, logger), true
+		}
+		return cached, true
+	}
+	return c.expiredConfig(config, shellVersion, sidcVersion, logger), true
+}
+
+func (c Client) expiredConfig(config Config, shellVersion, sidcVersion string, logger StateLogger) ShellConfig {
+	if logger != nil {
+		logger.Printf("configuration cache is outside its offline grace period")
+	}
+	return UnavailableShellConfig(config, shellVersion, sidcVersion, "La configuración guardada venció. Contactá a soporte para sincronizar AegisDesk.")
 }
 
 func (c Client) Resolve(ctx context.Context, config Config, openID, shellVersion, sidcVersion string) State {
@@ -153,11 +214,27 @@ func (c Client) Resolve(ctx context.Context, config Config, openID, shellVersion
 	if err == nil {
 		var envelope stateEnvelope
 		if decodeErr := json.Unmarshal(response, &envelope); decodeErr == nil {
-			if online, verifyErr := c.Verifier.Parse(envelope.StateToken, config.InstallID); verifyErr == nil {
+			var online State
+			var verifyErr error
+			if c.AllowUnsignedDev {
+				online, verifyErr = c.Verifier.ParseUnsignedDev(envelope.StateToken, config.InstallID)
+			} else {
+				online, verifyErr = c.Verifier.Parse(envelope.StateToken, config.InstallID)
+			}
+			if verifyErr == nil {
+				online.CacheState = online.Policy.CacheDisposition(time.Now().UTC(), c.Store.EffectiveNow(time.Now().UTC()))
+				if online.CacheState == CacheExpired || c.Store.IsPolicyRollback("state", online.Policy.IssuedAt) {
+					verifyErr = fmt.Errorf("state token is expired or older than the last accepted token")
+				} else if acceptErr := c.Store.AcceptPolicy("state", online.Policy, online.ServerTime); acceptErr != nil {
+					verifyErr = acceptErr
+				}
+			}
+			if verifyErr == nil {
 				if saveErr := c.Store.SaveCache(envelope.StateToken); saveErr != nil {
 					state.Failure = saveErr.Error()
 				}
 				if online.Config != nil {
+					online.Config.Policy = online.Policy
 					_ = c.Store.SaveShellConfig(*online.Config)
 				}
 				return online
@@ -172,18 +249,50 @@ func (c Client) Resolve(ctx context.Context, config Config, openID, shellVersion
 	}
 
 	if cachedToken, cacheErr := c.Store.LoadCache(); cacheErr == nil {
-		if cached, verifyErr := c.Verifier.Parse(cachedToken, config.InstallID); verifyErr == nil {
-			cached.Cached = true
-			cached.Failure = state.Failure
-			if cached.Config == nil {
-				if cfg, err := c.Store.LoadShellConfig(); err == nil {
-					cached.Config = &cfg
+		var cached State
+		var verifyErr error
+		if c.AllowUnsignedDev {
+			cached, verifyErr = c.Verifier.ParseUnsignedDev(cachedToken, config.InstallID)
+		} else {
+			cached, verifyErr = c.Verifier.Parse(cachedToken, config.InstallID)
+		}
+		if verifyErr == nil && !c.Store.IsPolicyRollback("state", cached.Policy.IssuedAt) {
+			cached.CacheState = cached.Policy.CacheDisposition(time.Now().UTC(), c.Store.EffectiveNow(time.Now().UTC()))
+			if cached.CacheState != CacheExpired {
+				cached.Cached = true
+				cached.Failure = state.Failure
+				if cached.Config == nil {
+					if cfg, err := c.Store.LoadShellConfig(); err == nil {
+						cached.Config = &cfg
+					}
 				}
+				return cached
 			}
-			return cached
 		}
 	}
 	return state
+}
+
+func configTime(config ShellConfig, fallback time.Time) time.Time {
+	if parsed, err := time.Parse(time.RFC3339, config.GeneratedAt); err == nil {
+		return parsed
+	}
+	return fallback
+}
+
+func (c Client) SendTermsAcceptance(ctx context.Context, config Config, acceptance TermsAcceptance) error {
+	body, err := json.Marshal(acceptance)
+	if err != nil {
+		return fmt.Errorf("encode terms acceptance: %w", err)
+	}
+	_, statusCode, _, err := c.doRequest(ctx, http.MethodPost, strings.TrimRight(config.WorkerBaseURL, "/")+"/api/shell/terms-acceptance", "Bearer "+config.Token, body, nil)
+	if err != nil {
+		return err
+	}
+	if statusCode < 200 || statusCode >= 300 {
+		return fmt.Errorf("terms acceptance returned HTTP %d", statusCode)
+	}
+	return nil
 }
 
 func (c Client) SendEvent(ctx context.Context, config Config, event Event) error {

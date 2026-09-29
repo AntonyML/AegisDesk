@@ -24,6 +24,26 @@ type Dialogs interface {
 	EnrollmentCode(ctx context.Context) (string, error)
 	SelectSIDC(ctx context.Context) (string, error)
 	Consent(ctx context.Context, notice state.Notice) bool
+	TermsAcceptance(ctx context.Context, termsVersion, termsURL, privacyURL string) bool
+}
+
+func (z Zenity) TermsAcceptance(parent context.Context, termsVersion, termsURL, privacyURL string) bool {
+	message := fmt.Sprintf("Para usar AegisDesk debés aceptar los Términos y Condiciones, versión %s.\n\nLos enlaces de términos y privacidad también están disponibles en la carpeta LICENSES de la instalación.", termsVersion)
+	if IsSafeURL(termsURL) {
+		message += "\nTérminos: " + termsURL
+	}
+	if IsSafeURL(privacyURL) {
+		message += "\nPrivacidad: " + privacyURL
+	}
+	message += "\n\nSi rechazás, no se enviará telemetría ni se abrirá SIDC."
+	return zenity.Question(message,
+		zenity.Title("Aceptar términos de AegisDesk"),
+		zenity.OKLabel("Acepto los términos"),
+		zenity.CancelLabel("Rechazo"),
+		zenity.NoCancel(),
+		zenity.Context(parent),
+		zenity.Width(560),
+	) == nil
 }
 
 type Zenity struct{}

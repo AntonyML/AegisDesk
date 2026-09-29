@@ -20,6 +20,8 @@ type ShellConfig struct {
 	GeneratedAt   string             `json:"generated_at"`
 	Installation  InstallationConfig `json:"installation"`
 	Support       SupportConfig      `json:"support"`
+	Policy        SignedPolicy       `json:"policy,omitempty"`
+	CacheState    string             `json:"-"`
 }
 
 type InstallationConfig struct {
@@ -138,5 +140,18 @@ func DefaultShellConfig(config Config, shellVersion, sidcVersion string) ShellCo
 			Links:     links,
 			UpdatedAt: now,
 		},
+		Policy: SignedPolicy{
+			RequiredTermsVersion: "0.1.0-draft",
+		},
+		CacheState: CachePackaged,
 	}
+}
+
+func UnavailableShellConfig(config Config, shellVersion, sidcVersion, reason string) ShellConfig {
+	result := DefaultShellConfig(config, shellVersion, sidcVersion)
+	result.Revision = "unavailable"
+	result.Installation.Status = "disabled"
+	result.CacheState = CacheUnavailable
+	result.Support.Message = reason
+	return result
 }

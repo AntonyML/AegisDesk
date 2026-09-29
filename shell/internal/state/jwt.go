@@ -18,12 +18,17 @@ var EmbeddedPublicKeyID = "ed25519-2026-01"
 var EmbeddedIssuer string
 
 type jwtClaims struct {
-	ProtocolVersion int          `json:"protocol_version"`
-	ServerTime      string       `json:"server_time"`
-	CacheUntil      string       `json:"cache_until"`
-	Contact         Contact      `json:"contact"`
-	Notices         []Notice     `json:"notices"`
-	Config          *ShellConfig `json:"config,omitempty"`
+	ProtocolVersion      int          `json:"protocol_version"`
+	ServerTime           string       `json:"server_time"`
+	CacheUntil           string       `json:"cache_until"`
+	CacheMaxAgeSeconds   int64        `json:"cacheMaxAgeSeconds"`
+	OfflineGraceSeconds  int64        `json:"offlineGraceSeconds"`
+	RequiredTermsVersion string       `json:"requiredTermsVersion"`
+	TermsURL             string       `json:"termsUrl"`
+	PrivacyURL           string       `json:"privacyUrl"`
+	Contact              Contact      `json:"contact"`
+	Notices              []Notice     `json:"notices"`
+	Config               *ShellConfig `json:"config,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -96,9 +101,31 @@ func (v Verifier) Parse(tokenString, installID string) (State, error) {
 			return nil, fmt.Errorf("unknown key id")
 		}
 		return key, nil
-	}, jwt.WithIssuer(v.Issuer), jwt.WithAudience("aegisdesk-shell-v1"), jwt.WithSubject(installID), jwt.WithLeeway(10*time.Second))
+	}, jwt.WithoutClaimsValidation())
 	if err != nil || token == nil || !token.Valid {
+		if err == nil {
+			err = fmt.Errorf("invalid token")
+		}
 		return State{}, fmt.Errorf("verify state token: %w", err)
+	}
+	return stateFromClaims(v, claims, installID)
+}
+
+func (v Verifier) ParseUnsignedDev(tokenString, installID string) (State, error) {
+	claims := &jwtClaims{}
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	if _, _, err := parser.ParseUnverified(tokenString, claims); err != nil {
+		return State{}, fmt.Errorf("parse unsigned development token: %w", err)
+	}
+	return stateFromClaims(v, claims, installID)
+}
+
+func stateFromClaims(v Verifier, claims *jwtClaims, installID string) (State, error) {
+	if claims.Issuer != v.Issuer {
+		return State{}, fmt.Errorf("state issuer does not match")
+	}
+	if !containsAudience(claims.Audience, "aegisdesk-shell-v1") {
+		return State{}, fmt.Errorf("state audience does not match")
 	}
 	if claims.ProtocolVersion != ProtocolVersion {
 		return State{}, fmt.Errorf("unsupported protocol version %d", claims.ProtocolVersion)
@@ -114,6 +141,29 @@ func (v Verifier) Parse(tokenString, installID string) (State, error) {
 	if !strings.EqualFold(claims.Subject, installID) {
 		return State{}, fmt.Errorf("state subject does not match installation")
 	}
+	issuedAt := serverTime
+	if claims.IssuedAt != nil {
+		issuedAt = claims.IssuedAt.Time
+	}
+	expiresAt := int64(0)
+	if claims.ExpiresAt != nil {
+		expiresAt = claims.ExpiresAt.Unix()
+	}
+	policy := SignedPolicy{
+		IssuedAt:             issuedAt.Unix(),
+		ExpiresAt:            expiresAt,
+		CacheMaxAgeSeconds:   claims.CacheMaxAgeSeconds,
+		OfflineGraceSeconds:  claims.OfflineGraceSeconds,
+		RequiredTermsVersion: claims.RequiredTermsVersion,
+		TermsURL:             claims.TermsURL,
+		PrivacyURL:           claims.PrivacyURL,
+	}.WithDefaults(serverTime)
+	if err := policy.Validate(serverTime); err != nil {
+		return State{}, fmt.Errorf("invalid signed policy: %w", err)
+	}
+	if claims.NotBefore != nil && claims.NotBefore.Time.After(time.Now().UTC().Add(10*time.Second)) {
+		return State{}, fmt.Errorf("state token is not active yet")
+	}
 	return State{
 		InstallID:  installID,
 		ServerTime: serverTime,
@@ -121,5 +171,15 @@ func (v Verifier) Parse(tokenString, installID string) (State, error) {
 		Contact:    claims.Contact,
 		Notices:    claims.Notices,
 		Config:     claims.Config,
+		Policy:     policy,
 	}, nil
+}
+
+func containsAudience(audience jwt.ClaimStrings, expected string) bool {
+	for _, value := range audience {
+		if strings.EqualFold(value, expected) {
+			return true
+		}
+	}
+	return false
 }

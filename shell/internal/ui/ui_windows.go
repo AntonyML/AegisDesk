@@ -807,6 +807,16 @@ func (d *nativeSupportDialog) drawContent(hdc uintptr, winW, winH int) {
 			drawText(hdc, supp.Notice, marginX+noticePad, curY+d.dp(6), contentW-(noticePad*2), d.dp(16), dtLeft|dtSingleLine)
 			curY += noticeH
 		}
+
+		for _, link := range supp.Links {
+			if strings.EqualFold(link.Label, "Abrir ticket") || link.URL == "" {
+				continue
+			}
+			pSelectObject.Call(hdc, d.fontCaption)
+			pSetTextColor.Call(hdc, uintptr(rgb(37, 99, 235)))
+			drawText(hdc, fmt.Sprintf("%s: %s", link.Label, link.URL), marginX, curY, contentW, d.dp(16), dtLeft|dtSingleLine)
+			curY += d.dp(16)
+		}
 	}
 
 	if d.timerActive && d.timerRemaining > 0 {
