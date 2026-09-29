@@ -15,6 +15,7 @@ export default defineConfig({
   ],
   test: {
     include: ["tests/**/*.test.ts"],
+    exclude: ["tests/migration.test.ts"],
     setupFiles: ["./tests/setup.ts"],
   },
 });

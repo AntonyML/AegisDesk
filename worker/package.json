@@ -6,10 +6,11 @@
     "types": "wrangler types",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:migrations": "vitest run --config vitest.migrations.config.ts",
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "verify": "npm run typecheck && npm test -- --run && npm run lint && npm run check",
+    "verify": "npm run typecheck && npm test -- --run && npm run test:migrations && npm run lint && npm run check",
     "deploy": "npm run verify && wrangler deploy",
     "check": "wrangler deploy --dry-run",
     "deploy:dry": "wrangler deploy --dry-run"
