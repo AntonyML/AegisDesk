@@ -23,6 +23,16 @@ export class InstallationRepository {
       .all();
   }
 
+  async find(id: string): Promise<InstallationRecord | null> {
+    return (
+      (await getDb(this.env)
+        .select()
+        .from(installations)
+        .where(eq(installations.id, id))
+        .get()) ?? null
+    );
+  }
+
   async markOpened(
     id: string,
     values: Pick<
@@ -37,10 +47,34 @@ export class InstallationRepository {
       .run();
   }
 
+  async update(
+    id: string,
+    values: Partial<
+      Pick<
+        InstallationRecord,
+        | "status"
+        | "equipmentName"
+        | "sidcTarget"
+        | "organizationId"
+        | "groupId"
+        | "assignedUserId"
+        | "updatedAt"
+        | "revokedAt"
+      >
+    >,
+  ): Promise<boolean> {
+    const result = await getDb(this.env)
+      .update(installations)
+      .set(values)
+      .where(eq(installations.id, id))
+      .run();
+    return result.meta.changes === 1;
+  }
+
   async revoke(id: string, revokedAt: string): Promise<boolean> {
     const result = await getDb(this.env)
       .update(installations)
-      .set({ status: "revoked", revokedAt })
+      .set({ status: "revoked", revokedAt, updatedAt: revokedAt })
       .where(eq(installations.id, id))
       .run();
     return result.meta.changes === 1;

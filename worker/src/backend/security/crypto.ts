@@ -23,7 +23,27 @@ export function timingSafeEqual(left: string, right: string): boolean {
 }
 
 export function jsonError(code: string, status: number): Response {
-  return Response.json({ error: code }, { status });
+  return Response.json(
+    { error: code, message: errorMessage(code) },
+    { status },
+  );
+}
+
+function errorMessage(code: string): string {
+  const messages: Record<string, string> = {
+    assignment_group_mismatch:
+      "El usuario y el grupo no pertenecen a la misma organización.",
+    assignment_organization_mismatch:
+      "La organización, el grupo y el usuario no son compatibles.",
+    group_not_available: "El grupo no existe o está desactivado.",
+    managed_user_not_available: "El usuario no existe o está desactivado.",
+    organization_not_available: "La organización no existe o está desactivada.",
+    organization_not_found: "La organización indicada no existe.",
+    installation_not_found: "La instalación indicada no existe.",
+    cycle_not_found: "El ciclo indicado no existe.",
+    invalid_payload: "Revisá los datos enviados.",
+  };
+  return messages[code] ?? code;
 }
 
 function toBase64Url(data: Uint8Array): string {

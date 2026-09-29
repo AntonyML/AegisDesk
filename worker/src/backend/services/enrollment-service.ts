@@ -79,18 +79,19 @@ export class EnrollmentService {
         "UPDATE enrollment_codes SET used_at = ? WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?",
       ).bind(now, await sha256(code), now),
       this.env.DB.prepare(
-        "INSERT INTO installations (id, token_hash, equipment_name, sidc_target, created_at, shell_version, sidc_version, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')",
+        "INSERT INTO installations (id, token_hash, equipment_name, sidc_target, created_at, updated_at, shell_version, sidc_version, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')",
       ).bind(
         installationId,
         await sha256(installationToken),
         input.equipment_name,
         input.sidc_target,
         now,
+        now,
         input.shell_version,
         input.sidc_version,
       ),
       this.env.DB.prepare(
-        "INSERT INTO cycles (id, installation_id, started_at, duration_months, due_at, status, created_by, reason) VALUES (?, ?, ?, ?, ?, 'active', ?, ?)",
+        "INSERT INTO cycles (id, installation_id, started_at, duration_months, due_at, status, created_by, reason, updated_at) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)",
       ).bind(
         cycleId,
         installationId,
@@ -99,6 +100,7 @@ export class EnrollmentService {
         dueAt,
         "enrollment",
         "initial cycle",
+        now,
       ),
       this.env.DB.prepare(
         "INSERT INTO events (id, installation_id, cycle_id, server_received_at, type, actor, shell_version, sidc_version, equipment_name, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",

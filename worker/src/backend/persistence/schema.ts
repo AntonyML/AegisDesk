@@ -6,6 +6,71 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+export const organizations = sqliteTable(
+  "organizations",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    status: text("status", { enum: ["active", "disabled"] })
+      .notNull()
+      .default("active"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("organizations_name_unique").on(table.name),
+    statusIdx: index("organizations_status_idx").on(table.status),
+  }),
+);
+
+export const groups = sqliteTable(
+  "groups",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id),
+    name: text("name").notNull(),
+    status: text("status", { enum: ["active", "disabled"] })
+      .notNull()
+      .default("active"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => ({
+    organizationNameUnique: uniqueIndex("groups_organization_name_unique").on(
+      table.organizationId,
+      table.name,
+    ),
+    organizationIdx: index("groups_organization_idx").on(table.organizationId),
+  }),
+);
+
+export const managedUsers = sqliteTable(
+  "managed_users",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id),
+    groupId: text("group_id").references(() => groups.id),
+    displayName: text("display_name").notNull(),
+    email: text("email"),
+    status: text("status", { enum: ["active", "disabled"] })
+      .notNull()
+      .default("active"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => ({
+    organizationIdx: index("managed_users_organization_idx").on(
+      table.organizationId,
+    ),
+    groupIdx: index("managed_users_group_idx").on(table.groupId),
+    statusIdx: index("managed_users_status_idx").on(table.status),
+  }),
+);
+
 export const installations = sqliteTable(
   "installations",
   {
@@ -14,13 +79,17 @@ export const installations = sqliteTable(
     equipmentName: text("equipment_name").notNull(),
     sidcTarget: text("sidc_target").notNull(),
     createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
     revokedAt: text("revoked_at"),
     shellVersion: text("shell_version").notNull(),
     sidcVersion: text("sidc_version").notNull(),
     lastOpenedAt: text("last_opened_at"),
-    status: text("status", { enum: ["active", "revoked"] })
+    status: text("status", { enum: ["active", "disabled", "revoked"] })
       .notNull()
       .default("active"),
+    organizationId: text("organization_id").references(() => organizations.id),
+    groupId: text("group_id").references(() => groups.id),
+    assignedUserId: text("assigned_user_id").references(() => managedUsers.id),
   },
   (table) => ({
     tokenHashUnique: uniqueIndex("installations_token_hash_unique").on(
@@ -29,6 +98,13 @@ export const installations = sqliteTable(
     statusIdx: index("installations_status_idx").on(table.status),
     lastOpenedIdx: index("installations_last_opened_idx").on(
       table.lastOpenedAt,
+    ),
+    organizationIdx: index("installations_organization_idx").on(
+      table.organizationId,
+    ),
+    groupIdx: index("installations_group_idx").on(table.groupId),
+    assignedUserIdx: index("installations_assigned_user_idx").on(
+      table.assignedUserId,
     ),
   }),
 );
@@ -64,6 +140,7 @@ export const cycles = sqliteTable(
       .default("active"),
     createdBy: text("created_by").notNull(),
     reason: text("reason").notNull(),
+    updatedAt: text("updated_at").notNull(),
   },
   (table) => ({
     dueIdx: index("cycles_due_idx").on(table.dueAt),
@@ -129,14 +206,46 @@ export const tickets = sqliteTable(
   }),
 );
 
+export const supportConfigs = sqliteTable(
+  "support_configs",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").references(() => organizations.id),
+    title: text("title").notNull(),
+    message: text("message").notNull(),
+    notice: text("notice").notNull().default(""),
+    areaName: text("area_name").notNull().default(""),
+    contactEmail: text("contact_email"),
+    contactPhone: text("contact_phone"),
+    hours: text("hours").notNull().default(""),
+    ticketUrl: text("ticket_url"),
+    docsUrl: text("docs_url"),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => ({
+    organizationUnique: uniqueIndex("support_configs_organization_unique").on(
+      table.organizationId,
+    ),
+    updatedIdx: index("support_configs_updated_idx").on(table.updatedAt),
+  }),
+);
+
 export const schema = {
+  organizations,
+  groups,
+  managedUsers,
   installations,
   enrollmentCodes,
   cycles,
   events,
   tickets,
+  supportConfigs,
 };
 
+export type OrganizationRecord = typeof organizations.$inferSelect;
+export type GroupRecord = typeof groups.$inferSelect;
+export type ManagedUserRecord = typeof managedUsers.$inferSelect;
 export type InstallationRecord = typeof installations.$inferSelect;
 export type EventRecord = typeof events.$inferSelect;
 export type TicketRecord = typeof tickets.$inferSelect;
+export type SupportConfigRecord = typeof supportConfigs.$inferSelect;
