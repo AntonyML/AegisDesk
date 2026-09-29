@@ -10,6 +10,14 @@ export function createPublicRoutes(): Hono<{ Bindings: Env }> {
   );
   routes.get("/", (c) => c.redirect("/tickets"));
   routes.get("/tickets", (c) => ticketPage(c.env));
+  routes.get("/legal/terms", async (c) => {
+    const { getTermsHtml } = await import("../legal/legal-pages");
+    return c.html(getTermsHtml());
+  });
+  routes.get("/legal/privacy", async (c) => {
+    const { getPrivacyHtml } = await import("../legal/legal-pages");
+    return c.html(getPrivacyHtml());
+  });
   routes.post("/api/v1/tickets", async (c) => {
     const input = await readTicketBody(c);
     const result = await new TicketService(c.env).create(

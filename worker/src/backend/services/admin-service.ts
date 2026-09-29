@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { addCalendarMonths, CycleReader, cyclePolicy } from "../domain/cycles";
 import { RequestError } from "../errors";
 import type {
+  BulkInstallationsInput,
   CyclePatchInput,
   InstallationPatchInput,
   TicketPatchInput,
@@ -35,7 +36,7 @@ export class AdminService {
     this.directory = new DirectoryService(env, now);
   }
 
-  async listInstallations(): Promise<
+  async listInstallations(orgId?: string | null): Promise<
     Array<
       InstallationRecord & {
         cycle: Awaited<ReturnType<CycleReader["activeCycle"]>>;
@@ -46,15 +47,30 @@ export class AdminService {
         assignedUser: Awaited<
           ReturnType<DirectoryService["requireManagedUser"]>
         >;
+        latestTermsVersion: string | null;
+        termsPending: boolean;
       }
     >
   > {
-    const rows = await this.installations.list();
-    const [organizations, groups, managedUsers] = await Promise.all([
-      this.directory.listOrganizations(),
-      this.directory.listGroups(),
-      this.directory.listManagedUsers(),
-    ]);
+    const allRows = await this.installations.list();
+    const rows = orgId
+      ? allRows.filter((row) => row.organizationId === orgId)
+      : allRows;
+    const [organizations, groups, managedUsers, acceptances] =
+      await Promise.all([
+        this.directory.listOrganizations(orgId),
+        this.directory.listGroups(orgId),
+        this.directory.listManagedUsers(orgId),
+        this.env.DB.prepare(
+          "SELECT installation_id, terms_version, received_at FROM terms_acceptances ORDER BY received_at DESC",
+        )
+          .all<{
+            installation_id: string;
+            terms_version: string;
+            received_at: string;
+          }>()
+          .catch(() => ({ results: [] })),
+      ]);
     const organizationById = new Map(
       organizations.map((item) => [item.id, item]),
     );
@@ -62,34 +78,64 @@ export class AdminService {
     const managedUserById = new Map(
       managedUsers.map((item) => [item.id, item]),
     );
+    const latestTermsByInstallation = new Map<string, string>();
+    for (const acc of acceptances.results ?? []) {
+      if (!latestTermsByInstallation.has(acc.installation_id)) {
+        latestTermsByInstallation.set(acc.installation_id, acc.terms_version);
+      }
+    }
+    const requiredVersion = this.env.REQUIRED_TERMS_VERSION || "0.1.0-draft";
+
     return Promise.all(
-      rows.map(async (row) => ({
-        ...row,
-        cycle: await this.cycles.activeCycle(row.id),
-        organization: row.organizationId
-          ? (organizationById.get(row.organizationId) ?? null)
-          : null,
-        group: row.groupId ? (groupById.get(row.groupId) ?? null) : null,
-        assignedUser: row.assignedUserId
-          ? (managedUserById.get(row.assignedUserId) ?? null)
-          : null,
-      })),
+      rows.map(async (row) => {
+        const latestTerms = latestTermsByInstallation.get(row.id) ?? null;
+        return {
+          ...row,
+          cycle: await this.cycles.activeCycle(row.id),
+          organization: row.organizationId
+            ? (organizationById.get(row.organizationId) ?? null)
+            : null,
+          group: row.groupId ? (groupById.get(row.groupId) ?? null) : null,
+          assignedUser: row.assignedUserId
+            ? (managedUserById.get(row.assignedUserId) ?? null)
+            : null,
+          latestTermsVersion: latestTerms,
+          termsPending: !latestTerms || latestTerms !== requiredVersion,
+        };
+      }),
     );
   }
 
-  listEvents(): Promise<EventRecord[]> {
-    return this.events.recent(500);
+  async listEvents(orgId?: string | null): Promise<EventRecord[]> {
+    const recent = await this.events.recent(500);
+    if (!orgId) return recent;
+
+    const orgInstallations = new Set(
+      (await this.installations.list())
+        .filter((i) => i.organizationId === orgId)
+        .map((i) => i.id),
+    );
+    return recent.filter(
+      (e) => e.installationId && orgInstallations.has(e.installationId),
+    );
   }
 
-  listTickets() {
-    return this.tickets.list(200);
+  async listTickets(orgId?: string | null) {
+    const list = await this.tickets.list(200);
+    if (!orgId) return list;
+    return list.filter((t) => t.organizationId === orgId);
   }
 
   async revokeInstallation(
     id: string,
     actor: string,
     reason: string,
+    orgId?: string | null,
   ): Promise<void> {
+    const current = await this.installations.find(id);
+    if (!current || (orgId && current.organizationId !== orgId)) {
+      throw new RequestError("installation_not_found", 404);
+    }
     const now = this.now().toISOString();
     if (!(await this.installations.revoke(id, now))) {
       throw new RequestError("installation_not_found", 404);
@@ -104,13 +150,24 @@ export class AdminService {
     });
   }
 
-  async renewCycle(cycleId: string, actor: string, reason: string) {
+  async renewCycle(
+    cycleId: string,
+    actor: string,
+    reason: string,
+    orgId?: string | null,
+  ) {
     const current = await getDb(this.env)
       .select()
       .from(cycles)
       .where(eq(cycles.id, cycleId))
       .get();
     if (!current) throw new RequestError("cycle_not_found", 404);
+    if (orgId) {
+      const inst = await this.installations.find(current.installationId);
+      if (!inst || inst.organizationId !== orgId) {
+        throw new RequestError("cycle_not_found", 404);
+      }
+    }
     const now = this.now().toISOString();
     const durationMonths = cyclePolicy.chooseDurationMonths();
     const dueAt = addCalendarMonths(
@@ -150,13 +207,24 @@ export class AdminService {
     return { duration_months: durationMonths, due_at: dueAt };
   }
 
-  async adjustCycle(cycleId: string, actor: string, input: CyclePatchInput) {
+  async adjustCycle(
+    cycleId: string,
+    actor: string,
+    input: CyclePatchInput,
+    orgId?: string | null,
+  ) {
     const current = await getDb(this.env)
       .select()
       .from(cycles)
       .where(eq(cycles.id, cycleId))
       .get();
     if (!current) throw new RequestError("cycle_not_found", 404);
+    if (orgId) {
+      const inst = await this.installations.find(current.installationId);
+      if (!inst || inst.organizationId !== orgId) {
+        throw new RequestError("cycle_not_found", 404);
+      }
+    }
     const dueAt =
       input.due_at ??
       (input.duration_months
@@ -191,30 +259,35 @@ export class AdminService {
     return { due_at: dueAt };
   }
 
-  listOrganizations() {
-    return this.directory.listOrganizations();
+  listOrganizations(orgId?: string | null) {
+    return this.directory.listOrganizations(orgId);
   }
 
-  listGroups() {
-    return this.directory.listGroups();
+  listGroups(orgId?: string | null) {
+    return this.directory.listGroups(orgId);
   }
 
-  listManagedUsers() {
-    return this.directory.listManagedUsers();
+  listManagedUsers(orgId?: string | null) {
+    return this.directory.listManagedUsers(orgId);
   }
 
   async updateInstallation(
     id: string,
     actor: string,
     input: InstallationPatchInput,
+    orgId?: string | null,
   ) {
     const current = await this.installations.find(id);
-    if (!current) throw new RequestError("installation_not_found", 404);
+    if (!current || (orgId && current.organizationId !== orgId)) {
+      throw new RequestError("installation_not_found", 404);
+    }
     const status = input.status ?? current.status;
     const organizationId =
-      input.organization_id === undefined
-        ? current.organizationId
-        : input.organization_id;
+      orgId !== undefined && orgId !== null
+        ? orgId
+        : input.organization_id === undefined
+          ? current.organizationId
+          : input.organization_id;
     const groupId =
       input.group_id === undefined ? current.groupId : input.group_id;
     const assignedUserId =
@@ -259,9 +332,12 @@ export class AdminService {
     id: string,
     actor: string,
     input: TicketPatchInput,
+    orgId?: string | null,
   ): Promise<void> {
     const current = await this.tickets.find(id);
-    if (!current) throw new RequestError("ticket_not_found", 404);
+    if (!current || (orgId && current.organizationId !== orgId)) {
+      throw new RequestError("ticket_not_found", 404);
+    }
     if (input.status) await this.tickets.updateStatus(id, input.status);
     await this.events.insert({
       id: crypto.randomUUID(),
@@ -274,5 +350,52 @@ export class AdminService {
         note: input.note ?? "",
       }),
     });
+  }
+
+  async bulkUpdateInstallations(
+    actor: string,
+    input: BulkInstallationsInput,
+    orgId?: string | null,
+  ): Promise<{ updated_count: number }> {
+    const now = this.now().toISOString();
+    let updatedCount = 0;
+    for (const id of input.installation_ids) {
+      const inst = await this.installations.find(id);
+      if (!inst) continue;
+      if (orgId && inst.organizationId !== orgId) continue;
+
+      await this.installations.update(id, {
+        status: input.status,
+        updatedAt: now,
+        revokedAt: input.status === "revoked" ? (inst.revokedAt ?? now) : null,
+      });
+      await this.events.insert({
+        id: crypto.randomUUID(),
+        installationId: id,
+        serverReceivedAt: now,
+        type: "admin_installation_updated",
+        actor,
+        payloadJson: JSON.stringify({
+          reason: input.reason,
+          status: input.status,
+          bulk: true,
+        }),
+      });
+      updatedCount++;
+    }
+
+    await this.events.insert({
+      id: crypto.randomUUID(),
+      serverReceivedAt: now,
+      type: "admin_bulk_installations_updated",
+      actor,
+      payloadJson: JSON.stringify({
+        reason: input.reason,
+        status: input.status,
+        count: updatedCount,
+      }),
+    });
+
+    return { updated_count: updatedCount };
   }
 }

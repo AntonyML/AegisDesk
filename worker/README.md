@@ -90,9 +90,11 @@ la primera ejecución de AegisDesk junto con la ruta del ejecutable operativo de
 SIDC. El Worker guarda únicamente hashes de los códigos y tokens permanentes.
 
 El Worker firma el estado con Ed25519. La clave pública se incrusta en el shell
-durante el build; una respuesta inválida no bloquea el arranque normal de SIDC.
-Los ciclos y eventos quedan en D1. El cron semanal elimina eventos con más de
-12 meses de antigüedad.
+durante el build; una respuesta inválida se rechaza y el shell falla cerrado
+según la política de caché y gracia. Los ciclos y eventos quedan en D1. El cron
+diario aplica la configuración de retención: telemetría a 365 días, auditoría a
+730 días, códigos vencidos a +7 días, tickets resueltos a 365 días, límites de
+tasa a 1 día y anonimización de instalaciones revocadas a 365 días.
 
 ## Envío y recepción de correo
 

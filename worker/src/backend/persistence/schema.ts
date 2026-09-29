@@ -197,12 +197,15 @@ export const tickets = sqliteTable(
       .default("open"),
     notified: integer("notified", { mode: "boolean" }).notNull().default(false),
     notifiedAt: text("notified_at"),
+    resolvedAt: text("resolved_at"),
+    organizationId: text("organization_id").references(() => organizations.id),
   },
   (table) => ({
     statusTimeIdx: index("tickets_status_time_idx").on(
       table.status,
       table.createdAt,
     ),
+    organizationIdx: index("tickets_organization_idx").on(table.organizationId),
   }),
 );
 
@@ -230,6 +233,60 @@ export const supportConfigs = sqliteTable(
   }),
 );
 
+export const adminMemberships = sqliteTable(
+  "admin_memberships",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    organizationId: text("organization_id").references(() => organizations.id),
+    role: text("role", {
+      enum: ["platform_owner", "org_admin", "org_viewer"],
+    }).notNull(),
+    createdAt: text("created_at").notNull(),
+    createdBy: text("created_by").notNull(),
+  },
+  (table) => ({
+    emailOrgUnique: uniqueIndex("admin_memberships_email_org_unique").on(
+      table.email,
+      table.organizationId,
+    ),
+    emailIdx: index("admin_memberships_email_idx").on(table.email),
+    orgIdx: index("admin_memberships_org_idx").on(table.organizationId),
+  }),
+);
+
+export const rateLimits = sqliteTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  resetAt: integer("reset_at").notNull(),
+});
+
+export const termsAcceptances = sqliteTable(
+  "terms_acceptances",
+  {
+    id: text("id").primaryKey(),
+    installationId: text("installation_id")
+      .notNull()
+      .references(() => installations.id),
+    termsVersion: text("terms_version").notNull(),
+    termsSha256: text("terms_sha256").notNull(),
+    acceptedAtClient: text("accepted_at_client").notNull(),
+    receivedAt: text("received_at").notNull(),
+    method: text("method", {
+      enum: ["installer", "first-run", "reacceptance"],
+    }).notNull(),
+    shellVersion: text("shell_version").notNull(),
+  },
+  (table) => ({
+    installVersionUnique: uniqueIndex(
+      "terms_acceptances_install_version_unique",
+    ).on(table.installationId, table.termsVersion),
+    installIdx: index("terms_acceptances_installation_idx").on(
+      table.installationId,
+    ),
+  }),
+);
+
 export const schema = {
   organizations,
   groups,
@@ -240,6 +297,9 @@ export const schema = {
   events,
   tickets,
   supportConfigs,
+  adminMemberships,
+  rateLimits,
+  termsAcceptances,
 };
 
 export type OrganizationRecord = typeof organizations.$inferSelect;
@@ -249,3 +309,6 @@ export type InstallationRecord = typeof installations.$inferSelect;
 export type EventRecord = typeof events.$inferSelect;
 export type TicketRecord = typeof tickets.$inferSelect;
 export type SupportConfigRecord = typeof supportConfigs.$inferSelect;
+export type AdminMembershipRecord = typeof adminMemberships.$inferSelect;
+export type RateLimitRecord = typeof rateLimits.$inferSelect;
+export type TermsAcceptanceRecord = typeof termsAcceptances.$inferSelect;

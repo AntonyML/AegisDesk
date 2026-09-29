@@ -1,6 +1,7 @@
 import { RequestError } from "../errors";
-import type { TicketInput } from "../http/validation";
+import { type TicketInput, validateTicketInput } from "../http/validation";
 import { TicketRepository } from "../persistence/repositories/ticket-repository";
+import { checkRateLimit } from "../security/rate-limit";
 
 const TICKET_TURNSTILE_ACTION = "ticket";
 
@@ -16,12 +17,13 @@ export class TicketService {
     remoteIp: string | undefined,
     expectedHostname: string,
   ): Promise<{ ticket_id: string; notified: boolean }> {
-    if (this.env.TICKET_RATE_LIMIT) {
-      const result = await this.env.TICKET_RATE_LIMIT.limit({
-        key: `ticket:${remoteIp ?? "unknown"}`,
-      });
-      if (!result.success) throw new RequestError("rate_limited", 429);
-    }
+    const validatedInput = validateTicketInput(input);
+
+    await checkRateLimit(this.env, `ticket:${remoteIp ?? "unknown"}`, {
+      limit: 10,
+      windowSeconds: 60,
+    });
+
     if (
       !(await this.verifyTurnstile(
         input.turnstile_token,
@@ -36,22 +38,22 @@ export class TicketService {
       return { ticket_id: existing.id, notified: existing.notified };
     }
     await this.tickets.create({
-      id: input.idempotency_key,
+      id: validatedInput.idempotency_key,
       createdAt: new Date().toISOString(),
-      name: input.name,
-      team: input.team,
-      description: input.description,
+      name: validatedInput.name,
+      team: validatedInput.team,
+      description: validatedInput.description,
       status: "open",
       notified: false,
     });
-    const notified = await this.sendEmail(input);
+    const notified = await this.sendEmail(validatedInput);
     if (notified) {
       await this.tickets.markNotified(
-        input.idempotency_key,
+        validatedInput.idempotency_key,
         new Date().toISOString(),
       );
     }
-    return { ticket_id: input.idempotency_key, notified };
+    return { ticket_id: validatedInput.idempotency_key, notified };
   }
 
   private async verifyTurnstile(
@@ -96,12 +98,23 @@ export class TicketService {
     ) {
       return false;
     }
+    const excerpt =
+      input.description.length > 300
+        ? `${input.description.slice(0, 300)}...`
+        : input.description;
+    const panelUrl = this.env.APP_URL
+      ? `${this.env.APP_URL.replace(/\/$/, "")}/admin`
+      : "Panel de administración";
+
     const text = [
-      `Ticket: ${input.idempotency_key}`,
+      `Ticket ID: ${input.idempotency_key}`,
       `Nombre: ${input.name}`,
       `Equipo: ${input.team}`,
       "",
-      input.description,
+      "Extracto:",
+      excerpt,
+      "",
+      `Ver detalle completo en el panel: ${panelUrl}`,
     ].join("\n");
     try {
       const response = await fetch("https://api.resend.com/emails", {

@@ -19,7 +19,12 @@
     "TICKET_URL": "https://aegisdesk.tonyml.com/tickets",
     "PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAAFHgQ5CkC8xaE4Xk",
     "NOTIFY_FROM": "aegisdesk@tonyml.com",
-    "NOTIFY_DESTINATION": "soporte@tonyml.com"
+    "NOTIFY_DESTINATION": "soporte@tonyml.com",
+    "REQUIRED_TERMS_VERSION": "0.1.0-draft",
+    "TERMS_URL": "https://aegisdesk.tonyml.com/legal/terms",
+    "PRIVACY_URL": "https://aegisdesk.tonyml.com/legal/privacy",
+    "CACHE_MAX_AGE_SECONDS": 259200,
+    "OFFLINE_GRACE_SECONDS": 1209600
   },
   "d1_databases": [
     {
@@ -30,7 +35,7 @@
     }
   ],
   "triggers": {
-    "crons": ["0 3 * * SUN"]
+    "crons": ["0 3 * * *"]
   },
   "routes": [
     {

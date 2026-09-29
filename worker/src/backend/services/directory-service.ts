@@ -21,7 +21,15 @@ export class DirectoryService {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  listOrganizations(): Promise<OrganizationRecord[]> {
+  listOrganizations(orgId?: string | null): Promise<OrganizationRecord[]> {
+    if (orgId) {
+      return getDb(this.env)
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, orgId))
+        .orderBy(asc(organizations.name))
+        .all();
+    }
     return getDb(this.env)
       .select()
       .from(organizations)
@@ -29,7 +37,15 @@ export class DirectoryService {
       .all();
   }
 
-  listGroups(): Promise<GroupRecord[]> {
+  listGroups(orgId?: string | null): Promise<GroupRecord[]> {
+    if (orgId) {
+      return getDb(this.env)
+        .select()
+        .from(groups)
+        .where(eq(groups.organizationId, orgId))
+        .orderBy(asc(groups.name))
+        .all();
+    }
     return getDb(this.env)
       .select()
       .from(groups)
@@ -37,7 +53,15 @@ export class DirectoryService {
       .all();
   }
 
-  listManagedUsers(): Promise<ManagedUserRecord[]> {
+  listManagedUsers(orgId?: string | null): Promise<ManagedUserRecord[]> {
+    if (orgId) {
+      return getDb(this.env)
+        .select()
+        .from(managedUsers)
+        .where(eq(managedUsers.organizationId, orgId))
+        .orderBy(asc(managedUsers.displayName))
+        .all();
+    }
     return getDb(this.env)
       .select()
       .from(managedUsers)
@@ -66,8 +90,17 @@ export class DirectoryService {
     id: string,
     actor: string,
     input: OrganizationInput,
+    orgId?: string | null,
   ): Promise<OrganizationRecord> {
+    if (orgId && id !== orgId) {
+      throw new RequestError("organization_not_found", 404);
+    }
     await this.requireOrganization(id);
+    if (input.status === "disabled") {
+      if (!input.confirm || !input.reason) {
+        throw new RequestError("confirmation_and_reason_required", 400);
+      }
+    }
     await getDb(this.env)
       .update(organizations)
       .set({
@@ -81,12 +114,17 @@ export class DirectoryService {
     return (await this.requireOrganization(id)) as OrganizationRecord;
   }
 
-  async createGroup(actor: string, input: GroupInput): Promise<GroupRecord> {
-    await this.requireActiveOrganization(input.organization_id);
+  async createGroup(
+    actor: string,
+    input: GroupInput,
+    orgId?: string | null,
+  ): Promise<GroupRecord> {
+    const targetOrgId = orgId ?? input.organization_id;
+    await this.requireActiveOrganization(targetOrgId);
     const now = this.now().toISOString();
     const record = {
       id: crypto.randomUUID(),
-      organizationId: input.organization_id,
+      organizationId: targetOrgId,
       name: input.name,
       status: input.status ?? "active",
       createdAt: now,
@@ -101,19 +139,44 @@ export class DirectoryService {
     id: string,
     actor: string,
     input: GroupInput,
+    orgId?: string | null,
   ): Promise<GroupRecord> {
-    await this.requireGroup(id);
-    await this.requireActiveOrganization(input.organization_id);
-    await getDb(this.env)
-      .update(groups)
-      .set({
-        organizationId: input.organization_id,
-        name: input.name,
-        status: input.status ?? "active",
-        updatedAt: this.now().toISOString(),
-      })
-      .where(eq(groups.id, id))
-      .run();
+    const current = await this.requireGroup(id);
+    if (!current || (orgId && current.organizationId !== orgId)) {
+      throw new RequestError("group_not_found", 404);
+    }
+    const targetOrgId = orgId ?? input.organization_id;
+    await this.requireActiveOrganization(targetOrgId);
+    const now = this.now().toISOString();
+
+    const movingOrg = current.organizationId !== targetOrgId;
+    if (movingOrg) {
+      await this.env.DB.batch([
+        this.env.DB.prepare(
+          "UPDATE groups SET organization_id = ?, name = ?, status = ?, updated_at = ? WHERE id = ?",
+        ).bind(targetOrgId, input.name, input.status ?? "active", now, id),
+        this.env.DB.prepare(
+          "UPDATE managed_users SET organization_id = ?, updated_at = ? WHERE group_id = ?",
+        ).bind(targetOrgId, now, id),
+        this.env.DB.prepare(
+          "UPDATE installations SET assigned_user_id = NULL WHERE group_id = ? AND assigned_user_id IN (SELECT id FROM managed_users WHERE organization_id != ?)",
+        ).bind(id, targetOrgId),
+        this.env.DB.prepare(
+          "UPDATE installations SET organization_id = ?, updated_at = ? WHERE group_id = ?",
+        ).bind(targetOrgId, now, id),
+      ]);
+    } else {
+      await getDb(this.env)
+        .update(groups)
+        .set({
+          organizationId: targetOrgId,
+          name: input.name,
+          status: input.status ?? "active",
+          updatedAt: now,
+        })
+        .where(eq(groups.id, id))
+        .run();
+    }
     await this.recordAudit("admin_group_updated", actor, id);
     return (await this.requireGroup(id)) as GroupRecord;
   }
@@ -121,12 +184,14 @@ export class DirectoryService {
   async createManagedUser(
     actor: string,
     input: ManagedUserInput,
+    orgId?: string | null,
   ): Promise<ManagedUserRecord> {
-    await this.validateUserAssignment(input.organization_id, input.group_id);
+    const targetOrgId = orgId ?? input.organization_id;
+    await this.validateUserAssignment(targetOrgId, input.group_id);
     const now = this.now().toISOString();
     const record = {
       id: crypto.randomUUID(),
-      organizationId: input.organization_id,
+      organizationId: targetOrgId,
       groupId: input.group_id ?? null,
       displayName: input.display_name,
       email: input.email ?? null,
@@ -143,13 +208,18 @@ export class DirectoryService {
     id: string,
     actor: string,
     input: ManagedUserInput,
+    orgId?: string | null,
   ): Promise<ManagedUserRecord> {
-    await this.requireManagedUser(id);
-    await this.validateUserAssignment(input.organization_id, input.group_id);
+    const current = await this.requireManagedUser(id);
+    if (!current || (orgId && current.organizationId !== orgId)) {
+      throw new RequestError("managed_user_not_found", 404);
+    }
+    const targetOrgId = orgId ?? input.organization_id;
+    await this.validateUserAssignment(targetOrgId, input.group_id);
     await getDb(this.env)
       .update(managedUsers)
       .set({
-        organizationId: input.organization_id,
+        organizationId: targetOrgId,
         groupId: input.group_id ?? null,
         displayName: input.display_name,
         email: input.email ?? null,

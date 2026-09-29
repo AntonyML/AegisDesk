@@ -40,9 +40,10 @@ export class TicketRepository {
     id: string,
     status: TicketRecord["status"],
   ): Promise<void> {
+    const resolvedAt = status === "resolved" ? new Date().toISOString() : null;
     await getDb(this.env)
       .update(tickets)
-      .set({ status })
+      .set({ status, resolvedAt })
       .where(eq(tickets.id, id))
       .run();
   }

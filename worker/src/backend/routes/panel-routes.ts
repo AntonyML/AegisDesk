@@ -7,7 +7,7 @@ import { SupportConfigService } from "../services/support-config-service";
 export function createPanelRoutes(): Hono<{ Bindings: Env }> {
   const routes = new Hono<{ Bindings: Env }>();
   routes.get("/panel", async (c) => {
-    await requireAdmin(c.req.raw, c.env);
+    const session = await requireAdmin(c.req.raw, c.env, "org_viewer");
     const service = new AdminService(c.env);
     const [
       installations,
@@ -18,13 +18,15 @@ export function createPanelRoutes(): Hono<{ Bindings: Env }> {
       managedUsers,
       support,
     ] = await Promise.all([
-      service.listInstallations(),
-      service.listEvents(),
-      service.listTickets(),
-      service.listOrganizations(),
-      service.listGroups(),
-      service.listManagedUsers(),
-      new SupportConfigService(c.env).getForOrganization(null),
+      service.listInstallations(session.organizationId),
+      service.listEvents(session.organizationId),
+      service.listTickets(session.organizationId),
+      service.listOrganizations(session.organizationId),
+      service.listGroups(session.organizationId),
+      service.listManagedUsers(session.organizationId),
+      new SupportConfigService(c.env).getForOrganization(
+        session.organizationId,
+      ),
     ]);
     return c.html(
       await panelPage(
@@ -44,6 +46,8 @@ export function createPanelRoutes(): Hono<{ Bindings: Env }> {
           assignedUserId: item.assignedUser?.id ?? null,
           assignedUserName: item.assignedUser?.displayName ?? null,
           sidcTarget: item.sidcTarget,
+          latestTermsVersion: item.latestTermsVersion ?? null,
+          termsPending: item.termsPending ?? true,
         })),
         tickets,
         events,
@@ -53,6 +57,7 @@ export function createPanelRoutes(): Hono<{ Bindings: Env }> {
           managedUsers,
           support,
         },
+        session.role,
       ),
     );
   });

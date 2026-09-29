@@ -41,6 +41,8 @@ function adminInit(init: RequestInit = {}): RequestInit {
     ...init,
     headers: {
       "x-aegis-test-admin": "1",
+      "content-type": "application/json",
+      origin: "https://aegisdesk.test",
       ...(init.headers ?? {}),
     },
   };

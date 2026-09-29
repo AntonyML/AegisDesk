@@ -1,13 +1,36 @@
+# Entorno local de desarrollo
 ENVIRONMENT=development
-ACCESS_TEAM_DOMAIN=https://example.cloudflareaccess.com
-ACCESS_AUDIENCE=replace-before-local-panel-test
-STATE_ISSUER=https://aegisdesk.tonyml.com
+
+# Cloudflare Access (Zero Trust)
+ACCESS_TEAM_DOMAIN=https://TU_EQUIPO.cloudflareaccess.com
+ACCESS_AUDIENCE=TU_ACCESS_AUDIENCE_AQUI
+
+# Firma de configuración para Shell (EdDSA / Ed25519)
+STATE_ISSUER=https://aegisdesk.ejemplo.com
 STATE_KEY_ID=ed25519-2026-01
-STATE_PRIVATE_KEY=replace-with-pkcs8-ed25519-secret
-CONTACT_NAME=Soporte Aegis
-TICKET_URL=https://aegisdesk.tonyml.com/tickets
-PUBLIC_TURNSTILE_SITE_KEY=replace-before-deploy
-TURNSTILE_SECRET=replace-before-deploy
-RESEND_API_KEY=replace-with-resend-secret
-NOTIFY_FROM=aegisdesk@tonyml.com
-NOTIFY_DESTINATION=soporte@tonyml.com
+STATE_PRIVATE_KEY=TU_PKCS8_ED25519_PRIVATE_KEY_PEM_AQUI
+
+# Información de contacto y soporte
+CONTACT_NAME=Soporte Tecnico
+TICKET_URL=https://aegisdesk.ejemplo.com/tickets
+
+# Cloudflare Turnstile (CAPTCHA)
+PUBLIC_TURNSTILE_SITE_KEY=TU_TURNSTILE_SITE_KEY_AQUI
+TURNSTILE_SECRET=TU_TURNSTILE_SECRET_AQUI
+
+# Servicio de notificaciones (Resend)
+RESEND_API_KEY=TU_RESEND_API_KEY_AQUI
+NOTIFY_FROM=aegisdesk@ejemplo.com
+NOTIFY_DESTINATION=soporte@ejemplo.com
+
+# Administradores con rol platform_owner (correos separados por coma)
+PLATFORM_OWNER_EMAILS=owner@ejemplo.com
+
+# Términos y privacidad (opcional: si está vacío no se fuerza la versión de términos)
+REQUIRED_TERMS_VERSION=
+TERMS_URL=https://aegisdesk.ejemplo.com/legal/terms
+PRIVACY_URL=https://aegisdesk.ejemplo.com/legal/privacy
+
+# Tiempos de retención de caché y gracia offline (en segundos)
+CACHE_MAX_AGE_SECONDS=259200
+OFFLINE_GRACE_SECONDS=1209600

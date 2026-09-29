@@ -37,8 +37,15 @@ async function jsonRequest(
   init: RequestInit = {},
   workerEnv: Env,
 ): Promise<Response> {
+  const headers = new Headers(init.headers);
+  if (!headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+  if (!headers.has("origin")) {
+    headers.set("origin", "https://aegisdesk.test");
+  }
   return app.fetch(
-    new Request(`https://aegisdesk.test${path}`, init),
+    new Request(`https://aegisdesk.test${path}`, { ...init, headers }),
     workerEnv,
   );
 }
@@ -165,10 +172,10 @@ describe("AegisDesk Worker integrated seams", () => {
     expect(eventResponse.status).toBe(202);
 
     const events = await workerEnv.DB.prepare(
-      "SELECT type FROM events WHERE installation_id = ? ORDER BY server_received_at",
+      "SELECT type, windows_user FROM events WHERE installation_id = ? ORDER BY server_received_at",
     )
       .bind(installBody.install_id)
-      .all<{ type: string }>();
+      .all<{ type: string; windows_user: string | null }>();
     expect(events.results.map((row) => row.type)).toEqual(
       expect.arrayContaining([
         "installation_enrolled",
@@ -176,6 +183,9 @@ describe("AegisDesk Worker integrated seams", () => {
         "launch_result",
       ]),
     );
+    expect(
+      events.results.find((row) => row.type === "launch_result")?.windows_user,
+    ).toBeNull();
   });
 
   it("persists a ticket before best-effort email and is idempotent", async () => {
@@ -184,7 +194,8 @@ describe("AegisDesk Worker integrated seams", () => {
     const payload = {
       name: "Persona de prueba",
       team: "Mesa de ayuda",
-      description: "No abre SIDC en el equipo de integración.",
+      category: "sidc",
+      issue_code: "no_abre",
       turnstile_token: "local-test",
       idempotency_key: ticketId,
     };
@@ -256,7 +267,8 @@ describe("AegisDesk Worker integrated seams", () => {
         body: JSON.stringify({
           name: "Persona de prueba",
           team: "Mesa de ayuda",
-          description: "Solicitud limitada.",
+          category: "sidc",
+          issue_code: "no_abre",
           turnstile_token: "local-test",
           idempotency_key: crypto.randomUUID(),
         }),
@@ -292,7 +304,8 @@ describe("AegisDesk Worker integrated seams", () => {
         body: JSON.stringify({
           name: "Persona de prueba",
           team: "Mesa de ayuda",
-          description: "Acción Turnstile inválida.",
+          category: "sidc",
+          issue_code: "no_abre",
           turnstile_token: "token-action-invalida",
           idempotency_key: crypto.randomUUID(),
         }),
@@ -304,7 +317,8 @@ describe("AegisDesk Worker integrated seams", () => {
     const payload = {
       name: "Persona de prueba",
       team: "Mesa de ayuda",
-      description: "Token Turnstile válido.",
+      category: "sidc",
+      issue_code: "no_abre",
       turnstile_token: "token-valido",
       idempotency_key: crypto.randomUUID(),
     };

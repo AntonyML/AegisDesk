@@ -14,6 +14,8 @@ export type PanelInstallation = {
   assignedUserId: string | null;
   assignedUserName: string | null;
   sidcTarget: string;
+  latestTermsVersion?: string | null;
+  termsPending?: boolean;
 };
 
 export type PanelOrganization = {

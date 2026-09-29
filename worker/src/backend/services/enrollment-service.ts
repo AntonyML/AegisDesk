@@ -67,6 +67,8 @@ export class EnrollmentService {
   ): Promise<EnrollmentResult> {
     const now = this.now().toISOString();
     const installationId = crypto.randomUUID();
+    const attemptTag = `${now}#${installationId}`;
+    const hashedCode = await sha256(code);
     const installationToken = randomToken(32);
     const durationMonths = cyclePolicy.chooseDurationMonths();
     const dueAt = addCalendarMonths(
@@ -77,9 +79,9 @@ export class EnrollmentService {
     const results = await this.env.DB.batch([
       this.env.DB.prepare(
         "UPDATE enrollment_codes SET used_at = ? WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?",
-      ).bind(now, await sha256(code), now),
+      ).bind(attemptTag, hashedCode, now),
       this.env.DB.prepare(
-        "INSERT INTO installations (id, token_hash, equipment_name, sidc_target, created_at, updated_at, shell_version, sidc_version, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')",
+        "INSERT INTO installations (id, token_hash, equipment_name, sidc_target, created_at, updated_at, shell_version, sidc_version, status) SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'active' WHERE EXISTS (SELECT 1 FROM enrollment_codes WHERE code_hash = ? AND used_at = ?)",
       ).bind(
         installationId,
         await sha256(installationToken),
@@ -89,9 +91,11 @@ export class EnrollmentService {
         now,
         input.shell_version,
         input.sidc_version,
+        hashedCode,
+        attemptTag,
       ),
       this.env.DB.prepare(
-        "INSERT INTO cycles (id, installation_id, started_at, duration_months, due_at, status, created_by, reason, updated_at) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)",
+        "INSERT INTO cycles (id, installation_id, started_at, duration_months, due_at, status, created_by, reason, updated_at) SELECT ?, ?, ?, ?, ?, 'active', ?, ?, ? WHERE EXISTS (SELECT 1 FROM enrollment_codes WHERE code_hash = ? AND used_at = ?)",
       ).bind(
         cycleId,
         installationId,
@@ -101,9 +105,11 @@ export class EnrollmentService {
         "enrollment",
         "initial cycle",
         now,
+        hashedCode,
+        attemptTag,
       ),
       this.env.DB.prepare(
-        "INSERT INTO events (id, installation_id, cycle_id, server_received_at, type, actor, shell_version, sidc_version, equipment_name, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO events (id, installation_id, cycle_id, server_received_at, type, actor, shell_version, sidc_version, equipment_name, payload_json) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM enrollment_codes WHERE code_hash = ? AND used_at = ?)",
       ).bind(
         crypto.randomUUID(),
         installationId,
@@ -115,6 +121,8 @@ export class EnrollmentService {
         input.sidc_version,
         input.equipment_name,
         JSON.stringify({}),
+        hashedCode,
+        attemptTag,
       ),
     ]);
     if (results[0]?.meta.changes !== 1) {

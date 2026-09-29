@@ -1,15 +1,26 @@
 import { Hono } from "hono";
 import { RequestError } from "../errors";
 import { readJson } from "../http/body";
-import { enrollmentSchema, eventSchema, stateSchema } from "../http/validation";
+import {
+  enrollmentSchema,
+  eventSchema,
+  stateSchema,
+  termsAcceptanceSchema,
+} from "../http/validation";
 import { enrollmentCode } from "../security/headers";
 import { InstallationAuthenticator } from "../security/installation-auth";
+import { checkRateLimit } from "../security/rate-limit";
 import { EnrollmentService } from "../services/enrollment-service";
 import { ShellService } from "../services/shell-service";
 
 export function createShellRoutes(): Hono<{ Bindings: Env }> {
   const routes = new Hono<{ Bindings: Env }>();
   routes.post("/api/v1/shell/enroll", async (c) => {
+    const remoteIp = c.req.header("cf-connecting-ip") ?? "unknown";
+    await checkRateLimit(c.env, `enroll:${remoteIp}`, {
+      limit: 10,
+      windowSeconds: 60,
+    });
     const code = enrollmentCode(c.req.raw);
     if (!code) throw new RequestError("enrollment_required", 401);
     const input = await readJson(c, enrollmentSchema);
@@ -58,5 +69,18 @@ export function createShellRoutes(): Hono<{ Bindings: Env }> {
     await new ShellService(c.env).recordEvent(installation, input);
     return c.json({ accepted: true }, 202);
   });
+
+  const handleTermsAcceptance = async (c: any) => {
+    const installation = await new InstallationAuthenticator(
+      c.env,
+    ).authenticate(c.req.raw);
+    const input = await readJson(c, termsAcceptanceSchema);
+    await new ShellService(c.env).recordTermsAcceptance(installation, input);
+    return new Response(null, { status: 204 });
+  };
+
+  routes.post("/api/shell/terms-acceptance", handleTermsAcceptance);
+  routes.post("/api/v1/shell/terms-acceptance", handleTermsAcceptance);
+
   return routes;
 }

@@ -5,21 +5,26 @@ export class RequestError extends Error {
   constructor(
     public readonly code: string,
     public readonly status: number,
+    public readonly details?: Record<string, unknown>,
   ) {
     super(code);
   }
 }
 
 export class AuthError extends RequestError {
-  constructor(code: string, status: 401 | 403) {
-    super(code, status);
+  constructor(
+    code: string,
+    status: 401 | 403,
+    details?: Record<string, unknown>,
+  ) {
+    super(code, status, details);
   }
 }
 
 export function registerErrorHandler(app: Hono<{ Bindings: Env }>): void {
   app.onError((error, c) => {
     if (error instanceof AuthError || error instanceof RequestError) {
-      return jsonError(error.code, error.status);
+      return jsonError(error.code, error.status, error.details);
     }
     console.error(
       JSON.stringify({

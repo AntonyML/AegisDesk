@@ -25,6 +25,7 @@ export function panelPage(
   tickets: PanelTicket[],
   events: PanelEvent[],
   admin: PanelAdminData = { organizations: [], groups: [], managedUsers: [] },
+  role: "platform_owner" | "org_admin" | "org_viewer" = "platform_owner",
 ) {
   const now = Date.now();
   const activeInstallations = installations.filter(
@@ -59,12 +60,16 @@ export function panelPage(
         <span class="table-primary">${item.equipmentName}</span>
         <span class="table-secondary">${truncateId(item.id)} · ${versions}</span>
         <span class="table-secondary">${item.organizationName ?? "Sin organización"} · ${item.groupName ?? "Sin grupo"}</span>
+        <span class="table-secondary">Términos: ${item.latestTermsVersion ?? "Sin aceptar"} ${item.termsPending ? html`<strong style="color: #f59e0b;">(Pendiente)</strong>` : ""}</span>
       </td>
       <td data-label="Estado"><span class="status-badge ${statusTone(item.status)}">${statusLabel(item.status)}</span></td>
       <td data-label="Última conexión" class="nowrap">${lastOpened}</td>
       <td data-label="Ciclo"><span class="table-secondary">${cycle}</span></td>
       <td data-label="Acciones">
-        <details class="action-menu">
+        ${
+          role === "org_viewer"
+            ? html`<span class="table-secondary">Lectura</span>`
+            : html`<details class="action-menu">
           <summary aria-label="${`Acciones para ${item.equipmentName}`}">⋯</summary>
           <div class="menu-items">
             <button type="button" data-equipment-open
@@ -84,7 +89,8 @@ export function panelPage(
             <button type="button" data-equipment-copy data-copy-value="${item.id}">Copiar identificador</button>
             ${item.status === "active" ? html`<button type="button" class="danger" data-revoke="${item.id}">Revocar instalación</button>` : ""}
           </div>
-        </details>
+        </details>`
+        }
       </td>
     </tr>`;
   });

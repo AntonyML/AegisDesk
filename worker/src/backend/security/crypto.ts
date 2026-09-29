@@ -22,15 +22,24 @@ export function timingSafeEqual(left: string, right: string): boolean {
   return difference === 0;
 }
 
-export function jsonError(code: string, status: number): Response {
+export function jsonError(
+  code: string,
+  status: number,
+  details?: Record<string, unknown>,
+): Response {
   return Response.json(
-    { error: code, message: errorMessage(code) },
+    { error: code, code, message: errorMessage(code), ...details },
     { status },
   );
 }
 
 function errorMessage(code: string): string {
   const messages: Record<string, string> = {
+    SENSITIVE_DATA_SUSPECTED:
+      "La descripción contiene datos sensibles o confidenciales (claves, contraseñas, tokens o tarjetas).",
+    TOO_LONG: "El campo excede la longitud máxima permitida.",
+    INVALID:
+      "El valor del campo es inválido o no cumple con el formato requerido.",
     assignment_group_mismatch:
       "El usuario y el grupo no pertenecen a la misma organización.",
     assignment_organization_mismatch:
@@ -42,6 +51,12 @@ function errorMessage(code: string): string {
     installation_not_found: "La instalación indicada no existe.",
     cycle_not_found: "El ciclo indicado no existe.",
     invalid_payload: "Revisá los datos enviados.",
+    rate_limited:
+      "Demasiadas solicitudes. Por favor intentá nuevamente más tarde.",
+    csrf_protection_failed:
+      "Petición rechazada por verificación de seguridad (CSRF).",
+    invalid_content_type:
+      "El encabezado Content-Type debe ser application/json.",
   };
   return messages[code] ?? code;
 }

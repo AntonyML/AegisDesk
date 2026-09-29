@@ -1,6 +1,10 @@
 import type { ShellConfig } from "../../contracts/shell-config";
 import { CycleReader, cyclePolicy } from "../domain/cycles";
-import type { EventInput, StateInput } from "../http/validation";
+import type {
+  EventInput,
+  StateInput,
+  TermsAcceptanceInput,
+} from "../http/validation";
 import { EventRepository } from "../persistence/repositories/event-repository";
 import { InstallationRepository } from "../persistence/repositories/installation-repository";
 import type { InstallationRecord } from "../persistence/schema";
@@ -135,11 +139,47 @@ export class ShellService {
       type: input.type,
       shellVersion: input.shell_version,
       sidcVersion: input.sidc_version,
-      windowsUser: input.windows_user,
       equipmentName: input.equipment_name ?? installation.equipmentName,
       consentState: input.consent_state,
       launchResult: input.launch_result,
       payloadJson: JSON.stringify({}),
+    });
+  }
+
+  async recordTermsAcceptance(
+    installation: InstallationRecord,
+    input: TermsAcceptanceInput,
+  ): Promise<void> {
+    const receivedAt = this.now().toISOString();
+    const shellVersion = input.shellVersion || installation.shellVersion;
+    await this.env.DB.prepare(
+      `INSERT INTO terms_acceptances (
+        id, installation_id, terms_version, terms_sha256, accepted_at_client, received_at, method, shell_version
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(installation_id, terms_version) DO NOTHING`,
+    )
+      .bind(
+        crypto.randomUUID(),
+        installation.id,
+        input.termsVersion,
+        input.termsSha256,
+        input.acceptedAt,
+        receivedAt,
+        input.method,
+        shellVersion,
+      )
+      .run();
+
+    await this.events.insert({
+      id: crypto.randomUUID(),
+      installationId: installation.id,
+      serverReceivedAt: receivedAt,
+      type: "terms_accepted",
+      shellVersion,
+      payloadJson: JSON.stringify({
+        terms_version: input.termsVersion,
+        method: input.method,
+      }),
     });
   }
 }

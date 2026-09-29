@@ -10,7 +10,7 @@ export default {
     env: Env,
     _ctx: ExecutionContext,
   ) {
-    await new CleanupService(env).pruneEvents();
+    await new CleanupService(env).runRetentionCleanup();
   },
 };
 
