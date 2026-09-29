@@ -129,14 +129,18 @@ jobs:
           }
           .\build.ps1 @buildArgs
 
-      - name: Sign Authenticode release artifacts
+      - name: Sign Authenticode release artifacts when configured
         shell: pwsh
         env:
           SIGNING_CERT_PFX_BASE64: ${{ secrets.SIGNING_CERT_PFX_BASE64 }}
           SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:SIGNING_CERT_PFX_BASE64) -and [string]::IsNullOrWhiteSpace($env:SIGNING_CERT_PASSWORD)) {
+            Write-Output '::warning::Release sin firma Authenticode: no hay certificado configurado. Windows puede mostrar editor desconocido o advertencias de SmartScreen.'
+            exit 0
+          }
           if ([string]::IsNullOrWhiteSpace($env:SIGNING_CERT_PFX_BASE64) -or [string]::IsNullOrWhiteSpace($env:SIGNING_CERT_PASSWORD)) {
-            throw 'Faltan SIGNING_CERT_PFX_BASE64 o SIGNING_CERT_PASSWORD; toda release automática o por tag debe quedar firmada.'
+            throw 'Configuración de firma incompleta: configurá ambos secretos SIGNING_CERT_PFX_BASE64 y SIGNING_CERT_PASSWORD, o eliminá ambos para publicar sin firma Authenticode.'
           }
           $pfx = Join-Path $env:RUNNER_TEMP 'aegisdesk-signing.pfx'
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGNING_CERT_PFX_BASE64))
