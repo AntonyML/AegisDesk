@@ -6,7 +6,7 @@
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers_%2B_D1-F38020?style=flat-square&logo=cloudflare)](https://workers.cloudflare.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
 [![Security](https://img.shields.io/badge/Signing-Ed25519_(EdDSA)-brightgreen?style=flat-square)](https://jwt.io)
-[![Tests](https://img.shields.io/badge/Tests-Passing_(16%2F16)-success?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/Tests-Passing_(48)-success?style=flat-square)]()
 [![Status](https://img.shields.io/badge/Estado-Fase_2_(Implementación)-informational?style=flat-square)]()
 
 ---
@@ -19,12 +19,22 @@
 
 ## 🛡️ Principios de diseño
 
-* **Filosofía Fail-Open:** En operación normal, la aplicación de destino se intenta abrir siempre. La indisponibilidad de red, fallos en el Worker o ausencia de caché local nunca bloquean el inicio del software por parte del usuario.
+* **Caché con ventana controlada:** Una caché firmada dentro de su TTL permite operar sin conexión; durante la gracia offline se muestra un aviso; fuera de la gracia, o ante una instalación ya sincronizada sin configuración válida, el shell solicita contacto. El fallback empaquetado `active` solo existe antes de la primera sincronización exitosa.
 * **Integridad del ejecutable:** El binario original de la aplicación y sus recursos asociados permanecen estrictamente intactos. AegisDesk no inyecta código, no altera la memoria ni modifica el software existente.
 * **Autoridad centralizada:** El Worker es la única fuente de verdad para el cálculo de fechas, vigencias, avisos y revocaciones. El *shell* local no calcula reglas de negocio; únicamente interpreta respuestas firmadas.
 * **Verificación criptográfica:** La comunicación y los estados locales se validan mediante tokens JWT estándar con algoritmo **Ed25519 (EdDSA)**.
-* **Privacidad estricta:** La telemetría es explícita y mínima (aperturas, resultado de lanzamiento, consentimientos). No se capturan pulsaciones de teclado, capturas de pantalla, documentos ni datos de bases de datos.
+* **Privacidad:** La telemetría operativa usa identificadores técnicos, versiones, nombre del equipo y resultados de eventos. El shell ya no envía el nombre de usuario de Windows. No captura pulsaciones, pantalla, documentos ni contenido de bases de datos.
 * **Protección Zero Trust:** El panel administrativo y sus endpoints están resguardados bajo **Cloudflare Access** con validación estricta de aserciones JWT (`cf-access-jwt-assertion`).
+
+Los borradores de términos, privacidad, retención, subencargados y respuesta a incidentes están en [`docs/legal/`](docs/legal/). Requieren revisión profesional antes de producción. El instalador interactivo registra la aceptación de términos; una instalación silenciosa deja la aceptación para el primer arranque. Los avisos de dependencias están en [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) y la política de vulnerabilidades en [`SECURITY.md`](SECURITY.md).
+
+## Independencia, propiedad y autorización de sistemas
+
+AegisDesk es software independiente desarrollado y provisto por **Antony Monge López** como servicio tecnológico independiente. La Organización cliente actual informada por el proveedor es **FEMUCARIBE**; los términos generales se mantienen reutilizables para otras organizaciones y los permisos concretos se documentan por separado.
+
+**SIDC no forma parte de AegisDesk.** El Proveedor no reclama derechos de propiedad, licencia, distribución ni titularidad sobre SIDC, sus bases de datos, código, documentación, infraestructura ni información. Esos derechos corresponden a FEMUCARIBE o al titular que jurídicamente corresponda. AegisDesk no concede autorización para acceder o usar SIDC; esa autorización debe provenir de FEMUCARIBE o del titular autorizado.
+
+AegisDesk puede interactuar técnicamente con sistemas institucionales o de terceros que la Organización cliente autorice. Su licencia cubre solo el software y los componentes originales de AegisDesk que el Proveedor posea o pueda licenciar. No cubre SIDC ni dependencias de terceros; estas últimas se rigen por las licencias incluidas en [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). AegisDesk no debe extraer ni almacenar contenido de SIDC; una función que lo requiera necesitará autorización expresa, finalidad documentada, minimización y aviso actualizado.
 
 ---
 
@@ -35,7 +45,7 @@ flowchart LR
     A["Acceso directo del usuario"] --> B["AegisDesk Shell (Go)"]
     B -->|1. Consulta estado (2-3s)| C["Cloudflare Worker (Hono + D1)"]
     C -->|2. Estado firmado (EdDSA)| B
-    B -->|3. Fallback / Fail-Open| D["Caché local (ProgramData)"]
+    B -->|3. Caché controlada / gracia offline| D["Caché local (ProgramData)"]
     B -->|4. Si mantenimiento vigente| E["Ejecutable de la aplicación"]
     B -->|5. Si mantenimiento vencido| F["Puerta de consentimiento (5s)"]
     F -->|Acepta| E
@@ -56,7 +66,7 @@ AegisDesk/
 │   ├── cmd/aegisdesk/     # Punto de entrada de la aplicación
 │   ├── internal/
 │   │   ├── launch/        # Ejecución controlada de la aplicación y creación de accesos .lnk
-│   │   ├── state/         # Cliente HTTP, resolución fail-open y verificación JWT
+│   │   ├── state/         # Cliente HTTP, caché controlada y verificación JWT
 │   │   └── ui/            # Diálogos nativos y botón de contacto
 │   ├── build.ps1          # Script de build, inyección de ldflags y empaquetado
 │   └── installer.iss      # Script del instalador Inno Setup
@@ -92,8 +102,10 @@ AegisDesk/
 ```bash
 cd worker
 npm install
-npm test            # Ejecuta los 16 tests de integración y ciclos
+npm test -- --run   # Ejecuta la suite de pruebas del Worker
 npm run lint        # Validación con Biome
+npm run typecheck   # Verificación TypeScript
+node scripts/sync-legal.mjs --check  # Evita desincronizar textos y hashes legales
 ```
 
 ### Shell (Windows / Go)
@@ -104,16 +116,28 @@ go test ./...       # Pruebas unitarias de launch y state
 .\build.ps1         # Compilación local con verificación de firmas
 ```
 
+### Guía de configuración antes de producción
+
+Los datos del titular y los contactos operativos ya fueron incorporados en los borradores de [`docs/legal/`](docs/legal/). Los documentos siguen marcados como borradores hasta la revisión profesional. El valor operativo inicial de retención está documentado en [`docs/legal/retention-policy.md`](docs/legal/retention-policy.md); no debe presentarse como un plazo legal sin esa revisión.
+
+1. Para desarrollo local, copiá `worker/.dev.vars.example` como `worker/.dev.vars` y completá los valores de prueba. Ese archivo es local y no debe agregarse a Git.
+2. En el entorno de producción de Cloudflare Workers, configurá los valores no secretos como variables y `STATE_PRIVATE_KEY`, `TURNSTILE_SECRET` y `RESEND_API_KEY` como secretos. Configurá también Access, `REQUIRED_TERMS_VERSION`, `TERMS_URL` y `PRIVACY_URL` para ese mismo entorno.
+3. En GitHub, abrí **Settings → Secrets and variables → Actions**. En **Variables**, configurá `INNO_SETUP_SHA256` (SHA-256 verificado del instalador Inno Setup 6.4.3 fijado por el workflow), `AEGISDESK_STATE_PUBLIC_KEY_BASE64` (clave pública que corresponde a la clave privada del Worker) y `AEGISDESK_WORKER_BASE_URL`.
+4. En **Secrets**, configurá `SIGNING_CERT_PFX_BASE64` y `SIGNING_CERT_PASSWORD` únicamente cuando dispongás de un certificado de firma autorizado. Una release por tag debe fallar si el instalador no queda firmado; nunca agregues el certificado al repositorio.
+5. No guardés claves privadas, tokens, contraseñas ni certificados en Git, en `README.md`, en tickets ni en este chat. `GITHUB_TOKEN` lo entrega GitHub Actions al job de publicación; no lo copies manualmente.
+6. Después de modificar términos o privacidad, ejecutá `node worker/scripts/sync-legal.mjs` desde la raíz y luego `node worker/scripts/sync-legal.mjs --check`. El build del shell valida los hashes de `docs/legal/LEGAL_VERSION.json`.
+7. Verificá antes de producción: revisión jurídica, DPA y regiones de Cloudflare/Resend, autorización documentada de cada Organización para sus sistemas, procedimiento de derechos, retención provisional de copias y contactos de incidentes. `windows_user` ya no se envía desde el shell; las filas históricas quedan sujetas a la limpieza de telemetría. Ejecutá las pruebas de shell y Worker; no uses `npm run check` como sustituto de una autorización de despliegue.
+
 ---
 
 ## 🚀 Estado del proyecto
 
 * [x] **Fase 1 — Diseño:** Especificación técnica, contratos de API y modelo de datos aprobados ([docs/diseno.md](docs/diseno.md)).
 * [x] **Fase 2 — Base implementada:**
-  - *Shell* en Go con resolución *fail-open*, verificación EdDSA y accesos directos Windows.
+  - *Shell* en Go con caché controlada, gracia offline, bloqueo fuera de ventana válida, verificación EdDSA y accesos directos Windows.
   - *Worker* en TypeScript con Hono, D1, jose, Turnstile y Cloudflare Access.
   - Panel administrativo con actualización de tickets y códigos de alta.
-  - Suite de 16 pruebas integradas en Workers y pruebas nativas en Go.
+  - Suite de pruebas del Worker y pruebas nativas en Go.
   - Pipeline de CI/CD en GitHub Actions (`release.yml`) con autoversionado semántico.
 * [ ] **Pendiente para puesta en producción:**
   - Despliegue de migraciones en Cloudflare D1 productivo.

@@ -492,7 +492,6 @@ texto operativo aprobado y datos no sensibles.
   "protocol_version": 1,
   "open_id": "<uuid>",
   "type": "opening",
-  "windows_user": "<usuario local, sin contraseña ni perfil>",
   "equipment_name": "<nombre visible del equipo>",
   "shell_version": "1.0.0",
   "sidc_version": "2.01.0300",
@@ -503,7 +502,7 @@ texto operativo aprobado y datos no sensibles.
 
 El Worker guarda `server_received_at` como fecha oficial. No se guarda IP,
 hostname completo, MAC, pantalla, proceso, teclas, documentos, consulta SQL ni
-contenido de SIDC. `launch_result` solo admite `success`, `failed` o
+contenido de SIDC. El protocolo actual no envía `windows_user`; el Worker elimina ese campo heredado de clientes anteriores y la columna existente solo puede contener registros históricos sujetos a retención. `launch_result` solo admite `success`, `failed` o
 `not_attempted`; `consent_state` admite `not_required`, `required`, `accepted` o
 `declined`; y el shell no envía rutas internas en caso de error. Los eventos de
 consentimiento (`consent_required`, `countdown_completed`, `consent_accepted`,
@@ -592,14 +591,16 @@ contrato público.
 | `installations` | `id`, `token_hash`, `equipment_name`, `sidc_target`, `created_at`, `revoked_at`, `shell_version`, `sidc_version`, `last_opened_at`, `status` | `id` único; token nunca en claro; revocación idempotente. La ruta se trata como dato de configuración, no como comando. |
 | `enrollment_codes` | `id`, `code_hash`, `created_at`, `expires_at`, `used_at`, `created_by` | Uso único, expiración corta y hash del código; nunca guardar el código. |
 | `cycles` | `id`, `installation_id`, `started_at`, `duration_months`, `due_at`, `status`, `created_by`, `reason` | Una fila activa por equipo; `due_at` se persiste y nunca se regenera al reiniciar. |
-| `events` | `id`, `installation_id`, `cycle_id`, `open_id`, `server_received_at`, `type`, `actor`, versiones, `windows_user`, `consent_state`, `launch_result`, `payload_json` mínimo | Única bitácora de aperturas, consentimientos y acciones administrativas. `open_id` e idempotency key evitan duplicados; los avisos se infieren de estos eventos. |
+| `events` | `id`, `installation_id`, `cycle_id`, `open_id`, `server_received_at`, `type`, `actor`, versiones, `equipment_name`, `consent_state`, `launch_result`, `payload_json` mínimo | Bitácora de aperturas, consentimientos y acciones administrativas. El campo histórico `windows_user` no se rellena con eventos actuales; `open_id` e idempotency key evitan duplicados. |
 | `tickets` | `id`, `created_at`, `name`, `team`, `description`, `status`, `notified`, `notified_at` | El ticket se conserva aunque falle el correo; `notified` es un resultado best effort. |
 
 Índices mínimos: `installations.status`, `installations.last_opened_at`,
 `enrollment_codes.expires_at`, `cycles.due_at`, `events.installation_id +
 server_received_at`, `events.type + server_received_at` y
-`tickets.status + created_at`. Un Cron Trigger semanal elimina `events` con más
-de 12 meses; tickets, instalaciones y ciclos siguen la retención institucional.
+`tickets.status + created_at`. El Cron Trigger diario aplica los valores
+provisionales documentados en `docs/legal/retention-policy.md`; tickets,
+instalaciones y ciclos siguen las reglas allí descritas y la configuración
+actual del Worker.
 
 ### Retención propuesta
 
