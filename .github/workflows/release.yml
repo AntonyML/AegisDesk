@@ -16,12 +16,19 @@ on:
 env:
   INNO_SETUP_VERSION: '6.4.3'
 
+# Serialize version calculation and publication to avoid duplicate versions.
+concurrency:
+  group: aegisdesk-shell-release
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build, sign and attest inputs
+    if: ${{ github.ref == 'refs/heads/main' || github.ref_type == 'tag' }}
     runs-on: windows-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      version_tag: ${{ steps.version.outputs.version_tag }}
     permissions:
       contents: read
 
@@ -32,17 +39,50 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.sha }}
 
-      - name: Resolve version from the triggering ref
+      - name: Calculate semantic release version
         id: version
         shell: pwsh
+        env:
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
         run: |
-          if ('${{ github.ref_type }}' -eq 'tag') {
-            $version = '${{ github.ref_name }}'.TrimStart('v')
-            if ($version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') { throw "Tag de release inválido: $version" }
+          $ErrorActionPreference = 'Stop'
+          if ($env:RELEASE_REF_TYPE -eq 'tag') {
+            $versionTag = $env:RELEASE_REF_NAME
+            if ($versionTag -notmatch '^v\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') { throw "Tag de release inválido: $versionTag" }
+            $version = $versionTag.Substring(1)
           } else {
-            $version = '0.1.0-dev'
+            $exactTags = @(git tag --points-at HEAD --sort=-v:refname)
+            if ($LASTEXITCODE -ne 0) { throw 'No se pudieron consultar los tags del commit.' }
+            $exactTag = $exactTags | Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } | Select-Object -First 1
+            if ($exactTag) {
+              $version = $exactTag.Substring(1)
+            } else {
+              $tags = @(git tag --merged HEAD --sort=-v:refname)
+              if ($LASTEXITCODE -ne 0) { throw 'No se pudieron consultar las versiones anteriores.' }
+              $latestTag = $tags | Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } | Select-Object -First 1
+              if (-not $latestTag) {
+                $version = '0.1.0'
+              } else {
+                $parts = $latestTag.Substring(1).Split('.')
+                $major, $minor, $patch = $parts | ForEach-Object { [int]$_ }
+                $messages = @(git log "$latestTag..HEAD" --format=%B)
+                if ($LASTEXITCODE -ne 0) { throw 'No se pudieron leer los commits para calcular la versión.' }
+                $history = $messages -join "`n"
+                if ($history -match '(?im)^BREAKING[ -]CHANGE:|^[a-z]+(\([^\r\n)]+\))?!:|^breaking:') {
+                  $major++; $minor = 0; $patch = 0
+                } elseif ($history -match '(?im)^feat(\([^\r\n)]+\))?:') {
+                  $minor++; $patch = 0
+                } else {
+                  $patch++
+                }
+                $version = "$major.$minor.$patch"
+              }
+            }
+            $versionTag = "v$version"
           }
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "version_tag=$versionTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Set up exact Go toolchain from go.mod
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
@@ -89,15 +129,14 @@ jobs:
           }
           .\build.ps1 @buildArgs
 
-      - name: Sign Authenticode artifacts on release tags
-        if: ${{ github.ref_type == 'tag' }}
+      - name: Sign Authenticode release artifacts
         shell: pwsh
         env:
           SIGNING_CERT_PFX_BASE64: ${{ secrets.SIGNING_CERT_PFX_BASE64 }}
           SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:SIGNING_CERT_PFX_BASE64) -or [string]::IsNullOrWhiteSpace($env:SIGNING_CERT_PASSWORD)) {
-            throw 'Faltan SIGNING_CERT_PFX_BASE64 o SIGNING_CERT_PASSWORD; una release por tag debe quedar firmada.'
+            throw 'Faltan SIGNING_CERT_PFX_BASE64 o SIGNING_CERT_PASSWORD; toda release automática o por tag debe quedar firmada.'
           }
           $pfx = Join-Path $env:RUNNER_TEMP 'aegisdesk-signing.pfx'
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGNING_CERT_PFX_BASE64))
@@ -150,7 +189,7 @@ jobs:
 
   release:
     name: Publish verified release
-    if: ${{ github.ref_type == 'tag' }}
+    if: ${{ github.ref == 'refs/heads/main' || github.ref_type == 'tag' }}
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -174,8 +213,9 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag_name: ${{ needs.build.outputs.version_tag }}
+          target_commitish: ${{ github.sha }}
+          name: Release ${{ needs.build.outputs.version_tag }}
           files: |
             release/*
             ${{ steps.attest.outputs.bundle-path }}
