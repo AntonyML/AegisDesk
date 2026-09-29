@@ -55,8 +55,8 @@ try {
     $legalRoot = Join-Path $root "..\docs\legal"
     $legalManifestPath = Join-Path $legalRoot "LEGAL_VERSION.json"
     $legalManifest = Get-Content $legalManifestPath -Raw | ConvertFrom-Json
-    $termsSource = Join-Path $legalRoot "terms-0.1.0-draft.es.md"
-    $privacySource = Join-Path $legalRoot "privacy-notice-0.1.0-draft.es.md"
+    $termsSource = Join-Path $legalRoot "terms-0.1.0.es.md"
+    $privacySource = Join-Path $legalRoot "privacy-notice-0.1.0.es.md"
     $termsHash = (Get-FileHash $termsSource -Algorithm SHA256).Hash.ToLower()
     $privacyHash = (Get-FileHash $privacySource -Algorithm SHA256).Hash.ToLower()
     if ($termsHash -ne $legalManifest.termsSha256 -or $privacyHash -ne $legalManifest.privacySha256) {
@@ -65,7 +65,7 @@ try {
     $ldflags += " -X main.termsSHA256=$termsHash"
     $legalStage = Join-Path $dist "legal"
     New-Item -ItemType Directory -Force -Path $legalStage | Out-Null
-    Copy-Item $termsSource (Join-Path $legalStage "terms-0.1.0-draft.es.txt") -Force
+    Copy-Item $termsSource (Join-Path $legalStage "terms-0.1.0.es.txt") -Force
     Copy-Item $privacySource, (Join-Path $legalRoot "LEGAL_VERSION.json"), (Join-Path $legalRoot "retention-policy.md"), (Join-Path $legalRoot "subprocessors.md"), (Join-Path $legalRoot "incident-response.md"), (Join-Path $legalRoot "organization-authorization-outline.md") $legalStage -Force
     Copy-Item (Join-Path $root "..\THIRD_PARTY_NOTICES.md") (Join-Path $legalStage "THIRD_PARTY_NOTICES.md") -Force
 
@@ -90,7 +90,7 @@ try {
             "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
         } elseif (Get-Command iscc.exe -ErrorAction SilentlyContinue) { "iscc.exe" } else { $null }
         if ($iscc) {
-            & $iscc "/O+" "/DMyAppVersion=$Version" "/DMyAppURL=$WorkerBaseURL" "/DLegalFile=dist\legal\terms-0.1.0-draft.es.txt" "/DTermsSha256=$termsHash" (Join-Path $root "installer.iss")
+            & $iscc "/O+" "/DMyAppVersion=$Version" "/DMyAppURL=$WorkerBaseURL" "/DLegalFile=dist\legal\terms-0.1.0.es.txt" "/DTermsSha256=$termsHash" (Join-Path $root "installer.iss")
         } else {
             Write-Warning "ISCC.exe no encontrado; se omite el instalador."
         }

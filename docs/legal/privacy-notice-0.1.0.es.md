@@ -1,10 +1,8 @@
-BORRADOR — REQUIERE REVISIÓN DE ABOGADO ANTES DE PRODUCCIÓN
-
 # Aviso de privacidad de AegisDesk
 
-Versión del borrador: `0.1.0-draft`.
+Versión: `0.1.0`.
 
-Este aviso se prepara como borrador para la Ley de Protección de la Persona frente al Tratamiento de sus Datos Personales (Ley 8968 de Costa Rica) y su Reglamento. Requiere revisión del responsable de la base, de la relación con cada Organización cliente y de los textos que se mostrarán en producción.
+Aviso aprobado por el proveedor de AegisDesk para su publicación.
 
 ## 1. Proveedor, roles de tratamiento y alcance
 
@@ -34,7 +32,7 @@ Los datos de AegisDesk (ID técnico, versiones, estado, ruta configurada del eje
 
 Las finalidades son: enrolar el equipo; autenticar la instalación; entregar configuración y estados firmados; mostrar soporte; gestionar ciclos de mantenimiento; impedir un lanzamiento desautorizado según el estado remoto; registrar aperturas y resultados; atender incidentes y tickets; prevenir abuso con Turnstile y límites; generar notificaciones; administrar organizaciones, equipos, usuarios y ciclos; y mantener seguridad y auditoría.
 
-La base jurídica no debe declararse de forma genérica. El abogado y cada Organización deben determinar para cada finalidad quién decide el tratamiento y si corresponde consentimiento informado u otra excepción o habilitación prevista en la Ley 8968 y su Reglamento. Este borrador no asume que la relación contractual ni un interés legítimo sean, por sí solos, base suficiente bajo el marco costarricense. La aceptación de términos del shell no se debe usar como sustituto automático de la base de tratamiento.
+La base jurídica no debe declararse de forma genérica. El abogado y cada Organización deben determinar para cada finalidad quién decide el tratamiento y si corresponde consentimiento informado u otra excepción o habilitación prevista en la Ley 8968 y su Reglamento. Este documento no asume que la relación contractual ni un interés legítimo sean, por sí solos, base suficiente bajo el marco costarricense. La aceptación de términos del shell no se debe usar como sustituto automático de la base de tratamiento.
 
 ## 5. Destinatarios y encargados
 

@@ -1,5 +1,3 @@
-BORRADOR — REQUIERE REVISIÓN DE ABOGADO ANTES DE PRODUCCIÓN
-
 # Avisos de terceros
 
 Este archivo acompaña al ejecutable y al instalador de AegisDesk. La clasificación se obtuvo de los módulos que aparecen en `go list -deps ./cmd/aegisdesk` y de los textos de licencia presentes en sus directorios de módulo. Las dependencias de pruebas y las herramientas que solo ejecutan en build se separan al final.

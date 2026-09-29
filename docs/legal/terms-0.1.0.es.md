@@ -1,10 +1,8 @@
-BORRADOR — REQUIERE REVISIÓN DE ABOGADO ANTES DE PRODUCCIÓN
-
 # Términos y Condiciones de AegisDesk
 
-Versión del borrador: `0.1.0-draft`.
+Versión: `0.1.0`.
 
-Este documento describe el uso de AegisDesk con base en el código revisado del repositorio al preparar este borrador. No constituye asesoría legal ni reemplaza la revisión del profesional responsable.
+Documento aprobado por el proveedor de AegisDesk para su publicación.
 
 ## 1. Partes y definiciones
 
@@ -51,9 +49,9 @@ Las finalidades son enrolar y autenticar la instalación, entregar configuració
 
 Los datos de AegisDesk (por ejemplo, ID técnico de instalación, versiones, estado, ruta configurada del ejecutable y eventos operativos) se distinguen del contenido de SIDC. AegisDesk no debe extraer ni almacenar contenido de SIDC; una función futura que lo requiera necesitará autorización expresa, finalidad definida, minimización y actualización del aviso antes de habilitarse. El shell no captura pulsaciones, audio, cámara, pantalla, documentos, portapapeles, bases de datos ni contenido de sesiones de SIDC. No debe enviarse información clínica, contraseñas, secretos ni datos de terceros que no sean necesarios para un ticket.
 
-La base jurídica para cada tratamiento debe identificarse antes de producción según la finalidad, quién decide los medios y fines, y la relación con cada Organización cliente. Este borrador no presume que el contrato, un interés legítimo o la aceptación de estos términos autoricen por sí solos todos los tratamientos. Deben revisarse el consentimiento informado y las excepciones o habilitaciones que realmente correspondan conforme a la Ley 8968 y su Reglamento. La Organización cliente debe definir sus instrucciones y avisos para sus Usuarios; la palabra “consentimiento” en la interfaz de mantenimiento describe la decisión operativa de continuar y no sustituye el análisis de protección de datos. La instalación o aceptación de estos términos no constituye autorización general para cualquier tratamiento o transferencia.
+La base jurídica para cada tratamiento debe identificarse antes de producción según la finalidad, quién decide los medios y fines, y la relación con cada Organización cliente. Este documento no presume que el contrato, un interés legítimo o la aceptación de estos términos autoricen por sí solos todos los tratamientos. Deben revisarse el consentimiento informado y las excepciones o habilitaciones que realmente correspondan conforme a la Ley 8968 y su Reglamento. La Organización cliente debe definir sus instrucciones y avisos para sus Usuarios; la palabra “consentimiento” en la interfaz de mantenimiento describe la decisión operativa de continuar y no sustituye el análisis de protección de datos. La instalación o aceptación de estos términos no constituye autorización general para cualquier tratamiento o transferencia.
 
-Los terceros y encargados identificados en el repositorio se describen en [subprocessors.md](subprocessors.md). El detalle de finalidades, derechos y retención se amplía en [privacy-notice-0.1.0-draft.es.md](privacy-notice-0.1.0-draft.es.md) y [retention-policy.md](retention-policy.md).
+Los terceros y encargados identificados en el repositorio se describen en [subprocessors.md](subprocessors.md). El detalle de finalidades, derechos y retención se amplía en [privacy-notice-0.1.0.es.md](privacy-notice-0.1.0.es.md) y [retention-policy.md](retention-policy.md).
 
 ## 6. Tickets y contenido prohibido
 
@@ -73,7 +71,7 @@ AegisDesk es una herramienta independiente que puede interactuar técnicamente c
 
 El Software y el Servicio se proporcionan “tal cual”, en la medida permitida por la ley. No se excluyen el dolo, la culpa grave ni derechos irrenunciables. Cualquier tope de responsabilidad queda pendiente de definición con abogado y debe respetar los derechos irrenunciables aplicables a consumidores: **[CRITERIO A DEFINIR CON ABOGADO]**. No se prometen disponibilidad continua, prevención absoluta de fallos ni recepción instantánea de revocaciones offline.
 
-No se establecen cláusulas de indemnidad, daños punitivos ni penalidades automáticas en este borrador. Los remedios quedan limitados a medidas cautelares y daños reales conforme a la ley civil y comercial aplicable.
+No se establecen cláusulas de indemnidad, daños punitivos ni penalidades automáticas en este documento. Los remedios quedan limitados a medidas cautelares y daños reales conforme a la ley civil y comercial aplicable.
 
 ## 10. Suspensión, terminación y efectos
 

@@ -1,5 +1,3 @@
-BORRADOR — REQUIERE REVISIÓN DE ABOGADO ANTES DE PRODUCCIÓN
-
 # Política de retención propuesta
 
 Esta política contiene valores operativos provisionales propuestos por el proveedor para revisión y configuración con cada Organización cliente. No son plazos legales ni valores definitivos. En el Worker los plazos implementados son constantes de código; no existe todavía una configuración por organización o panel. Deben revisarse con abogado y contrastarse con copias, servicios y producción antes de publicarse.

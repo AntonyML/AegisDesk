@@ -8,10 +8,10 @@
   #define MyAppURL "https://aegisdesk.tonyml.com"
 #endif
 #ifndef LegalFile
-  #define LegalFile "dist\legal\terms-0.1.0-draft.es.txt"
+  #define LegalFile "dist\legal\terms-0.1.0.es.txt"
 #endif
 #ifndef TermsSha256
-  #define TermsSha256 "41369a800a8001463b8b95f2c4358f5683c7888e6fe83df61d8386e281de3104"
+  #define TermsSha256 "79765d47cf45104b3d6d2488eaf29e406413b0bbff6dd778418880e55ff0e6be"
 #endif
 #define MyAppExeName "AegisDesk.exe"
 
@@ -48,8 +48,8 @@ Source: "assets\aegis_shell.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD_PARTY_NOTICES.md"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 Source: "..\SECURITY.md"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
-Source: "..\docs\legal\terms-0.1.0-draft.es.md"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
-Source: "..\docs\legal\privacy-notice-0.1.0-draft.es.md"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
+Source: "..\docs\legal\terms-0.1.0.es.md"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
+Source: "..\docs\legal\privacy-notice-0.1.0.es.md"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 Source: "..\docs\legal\LEGAL_VERSION.json"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 Source: "..\docs\legal\retention-policy.md"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 Source: "..\docs\legal\subprocessors.md"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
@@ -59,8 +59,8 @@ Source: "..\docs\legal\organization-authorization-outline.md"; DestDir: "{app}\L
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\aegis_shell.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{group}\Términos y condiciones"; Filename: "{app}\LICENSES\terms-0.1.0-draft.es.md"
-Name: "{group}\Aviso de privacidad"; Filename: "{app}\LICENSES\privacy-notice-0.1.0-draft.es.md"
+Name: "{group}\Términos y condiciones"; Filename: "{app}\LICENSES\terms-0.1.0.es.md"
+Name: "{group}\Aviso de privacidad"; Filename: "{app}\LICENSES\privacy-notice-0.1.0.es.md"
 Name: "{group}\Avisos de terceros"; Filename: "{app}\LICENSES\THIRD_PARTY_NOTICES.md"
 
 [Dirs]
@@ -115,7 +115,7 @@ begin
     ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
     exit;
   AcceptancePath := AddBackslash(DataDir) + 'terms-acceptance.json';
-  Content := '{"termsVersion":"0.1.0-draft","termsSha256":"' +
+  Content := '{"termsVersion":"0.1.0","termsSha256":"' +
     '{#TermsSha256}' +
     '","acceptedAt":"' + UtcTimestamp + '","method":"installer"}';
   SaveStringToFile(AcceptancePath, Content, False);

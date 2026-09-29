@@ -1,6 +1,6 @@
 {
-  "termsVersion": "0.1.0-draft",
-  "termsSha256": "5deb13f5ed63917d8766b8857c4872ab3969fc483481689db79efa56f49180b9",
-  "privacyVersion": "0.1.0-draft",
-  "privacySha256": "ea5bd48feb0c6dfc4aad9f076ebf893df51c5b762345f01683e59dfb27ee52a3"
+  "termsVersion": "0.1.0",
+  "termsSha256": "79765d47cf45104b3d6d2488eaf29e406413b0bbff6dd778418880e55ff0e6be",
+  "privacyVersion": "0.1.0",
+  "privacySha256": "defbd6a48b07d3039886eacadf87ed8f18c60407476d28980ead0445511b7dca"
 }

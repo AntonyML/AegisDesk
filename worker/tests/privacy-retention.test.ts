@@ -199,7 +199,7 @@ describe("W-8 retention policy and titular privacy rights", () => {
         "INSERT INTO installations (id, token_hash, equipment_name, sidc_target, organization_id, assigned_user_id, status, created_at, updated_at, shell_version, sidc_version) VALUES (?, 'hash-titular', 'PC-Titular', 'C:\\app.exe', 'org-privacy', ?, 'active', ?, ?, '1.0', '1.0')",
       ).bind(instId, userId, now, now),
       workerEnv.DB.prepare(
-        "INSERT INTO terms_acceptances (id, installation_id, terms_version, terms_sha256, accepted_at_client, received_at, method, shell_version) VALUES ('terms-titular', ?, '0.1.0-draft', '9dc95681c0fa738e52f87c57e025b5bf8bdbbae0a1ebb1a805b85726e35851b6', ?, ?, 'installer', '1.0.0')",
+        "INSERT INTO terms_acceptances (id, installation_id, terms_version, terms_sha256, accepted_at_client, received_at, method, shell_version) VALUES ('terms-titular', ?, '0.1.0', '9dc95681c0fa738e52f87c57e025b5bf8bdbbae0a1ebb1a805b85726e35851b6', ?, ?, 'installer', '1.0.0')",
       ).bind(instId, now, now),
       workerEnv.DB.prepare(
         "INSERT INTO tickets (id, name, team, description, status, notified, organization_id, created_at) VALUES ('ticket-titular', ?, 'Sistemas', 'Problema con la VPN', 'open', 0, 'org-privacy', ?)",

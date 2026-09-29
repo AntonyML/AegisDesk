@@ -1,5 +1,3 @@
-BORRADOR — REQUIERE REVISIÓN DE ABOGADO ANTES DE PRODUCCIÓN
-
 # Política de divulgación de vulnerabilidades
 
 No incluyas vulnerabilidades, tokens, datos personales ni archivos de clientes en issues públicos o tickets ordinarios. Reportá de forma privada a **antonyml2016@gmail.com** con una descripción reproducible, versión afectada, impacto, evidencia mínima y una forma segura de contacto. Este es el correo general vigente; un alias dedicado de seguridad de AegisDesk queda pendiente de habilitar.

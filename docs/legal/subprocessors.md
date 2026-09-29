@@ -1,5 +1,3 @@
-BORRADOR — REQUIERE REVISIÓN DE ABOGADO ANTES DE PRODUCCIÓN
-
 # Proveedores y subencargados identificados
 
 Esta lista se limita a proveedores que aparecen en el repositorio o en su pipeline. No confirma que exista un contrato, DPA, región o configuración de producción; cada dato debe verificarse antes de publicar el aviso.

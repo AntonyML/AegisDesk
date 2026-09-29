@@ -215,7 +215,7 @@ func main() {
 func ensureTermsAccepted(ctx context.Context, store state.Store, client state.Client, config state.Config, policy state.SignedPolicy, dialogs ui.Dialogs, logger *ui.Logger) bool {
 	version := policy.RequiredTermsVersion
 	if version == "" {
-		version = "0.1.0-draft"
+		version = "0.1.0"
 	}
 	hash := termsHashForVersion(version)
 	if hash == "" {
@@ -281,7 +281,7 @@ func flushPendingTerms(ctx context.Context, store state.Store, client state.Clie
 }
 
 func termsHashForVersion(version string) string {
-	if version == "0.1.0-draft" && termsSHA256 != "" {
+	if version == "0.1.0" && termsSHA256 != "" {
 		return strings.ToLower(termsSHA256)
 	}
 	executable, err := os.Executable()

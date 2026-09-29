@@ -1,5 +1,3 @@
-BORRADOR — REQUIERE REVISIÓN DE ABOGADO ANTES DE PRODUCCIÓN
-
 # Plan breve de respuesta a incidentes
 
 ## Detección

@@ -141,7 +141,7 @@ func DefaultShellConfig(config Config, shellVersion, sidcVersion string) ShellCo
 			UpdatedAt: now,
 		},
 		Policy: SignedPolicy{
-			RequiredTermsVersion: "0.1.0-draft",
+			RequiredTermsVersion: "0.1.0",
 		},
 		CacheState: CachePackaged,
 	}

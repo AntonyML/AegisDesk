@@ -42,7 +42,7 @@ describe("W-4 signed config and cache policy", () => {
       STATE_PRIVATE_KEY: privatePem,
       STATE_KEY_ID: "test-key",
       STATE_ISSUER: "https://aegisdesk.test",
-      REQUIRED_TERMS_VERSION: "0.1.0-draft",
+      REQUIRED_TERMS_VERSION: "0.1.0",
       TERMS_URL: "https://aegisdesk.test/legal/terms",
       PRIVACY_URL: "https://aegisdesk.test/legal/privacy",
       CACHE_MAX_AGE_SECONDS: 259200,
@@ -65,7 +65,7 @@ describe("W-4 signed config and cache policy", () => {
     const claims = decodeJwt(token) as Record<string, unknown>;
     expect(claims.cacheMaxAgeSeconds).toBe(259200);
     expect(claims.offlineGraceSeconds).toBe(1209600);
-    expect(claims.requiredTermsVersion).toBe("0.1.0-draft");
+    expect(claims.requiredTermsVersion).toBe("0.1.0");
     expect(claims.termsUrl).toBe("https://aegisdesk.test/legal/terms");
     expect(claims.privacyUrl).toBe("https://aegisdesk.test/legal/privacy");
 

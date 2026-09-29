@@ -195,16 +195,21 @@ func TestConfigDoesNotPersistBearerTokenInJSON(t *testing.T) {
 func TestTermsAcceptanceValidation(t *testing.T) {
 	now := time.Now().UTC()
 	acceptance := TermsAcceptance{
-		TermsVersion: "0.1.0-draft",
+		TermsVersion: "0.1.0",
 		TermsSha256:  "abc",
 		AcceptedAt:   now.Format(time.RFC3339),
 		Method:       "installer",
 	}
-	if !acceptance.ValidFor("0.1.0-draft", "ABC", now) {
+	if !acceptance.ValidFor("0.1.0", "ABC", now) {
 		t.Fatal("expected acceptance to validate case-insensitively")
 	}
+	previous := acceptance
+	previous.TermsVersion = "0.1.0-draft"
+	if previous.ValidFor("0.1.0", "abc", now) {
+		t.Fatal("draft acceptance must not validate the published version")
+	}
 	acceptance.Method = "unknown"
-	if acceptance.ValidFor("0.1.0-draft", "abc", now) {
+	if acceptance.ValidFor("0.1.0", "abc", now) {
 		t.Fatal("unexpected valid acceptance method")
 	}
 }

@@ -84,7 +84,7 @@ export class AdminService {
         latestTermsByInstallation.set(acc.installation_id, acc.terms_version);
       }
     }
-    const requiredVersion = this.env.REQUIRED_TERMS_VERSION || "0.1.0-draft";
+    const requiredVersion = this.env.REQUIRED_TERMS_VERSION || "0.1.0";
 
     return Promise.all(
       rows.map(async (row) => {

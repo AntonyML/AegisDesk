@@ -1,5 +1,3 @@
-BORRADOR — REQUIERE REVISIÓN DE ABOGADO ANTES DE PRODUCCIÓN
-
 # Temario para autorización de una Organización
 
 Este documento no redacta cláusulas contractuales. Es una lista de temas que un abogado debe convertir en un acuerdo específico con cada Organización cliente.

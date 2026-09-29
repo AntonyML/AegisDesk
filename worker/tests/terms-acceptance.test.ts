@@ -2,8 +2,8 @@ import { env } from "cloudflare:workers";
 import crypto from "node:crypto";
 import { describe, expect, it } from "vitest";
 import legalVersion from "../../docs/legal/LEGAL_VERSION.json";
-import privacyMarkdownRaw from "../../docs/legal/privacy-notice-0.1.0-draft.es.md?raw";
-import termsMarkdownRaw from "../../docs/legal/terms-0.1.0-draft.es.md?raw";
+import privacyMarkdownRaw from "../../docs/legal/privacy-notice-0.1.0.es.md?raw";
+import termsMarkdownRaw from "../../docs/legal/terms-0.1.0.es.md?raw";
 import { app } from "../src";
 import legalData from "../src/backend/legal/legal-content.json";
 import { sha256 } from "../src/backend/security/crypto";
@@ -12,7 +12,7 @@ function makeEnv(overrides: Partial<Env> = {}): Env {
   return {
     ...env,
     ENVIRONMENT: "test",
-    REQUIRED_TERMS_VERSION: "0.1.0-draft",
+    REQUIRED_TERMS_VERSION: "0.1.0",
     ...overrides,
   } as unknown as Env;
 }
@@ -88,7 +88,7 @@ describe("W-5 terms acceptance and legal pages", () => {
       .run();
 
     const validBody = {
-      termsVersion: "0.1.0-draft",
+      termsVersion: "0.1.0",
       termsSha256:
         "9dc95681c0fa738e52f87c57e025b5bf8bdbbae0a1ebb1a805b85726e35851b6",
       acceptedAt: "2026-09-29T12:00:00.000Z",
@@ -148,7 +148,7 @@ describe("W-5 terms acceptance and legal pages", () => {
         method: string;
       }>();
     expect(row).not.toBeNull();
-    expect(row?.terms_version).toBe("0.1.0-draft");
+    expect(row?.terms_version).toBe("0.1.0");
     expect(row?.method).toBe("installer");
     expect(row?.received_at).toBeDefined();
 

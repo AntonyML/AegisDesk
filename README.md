@@ -26,7 +26,7 @@
 * **Privacidad:** La telemetría operativa usa identificadores técnicos, versiones, nombre del equipo y resultados de eventos. El shell ya no envía el nombre de usuario de Windows. No captura pulsaciones, pantalla, documentos ni contenido de bases de datos.
 * **Protección Zero Trust:** El panel administrativo y sus endpoints están resguardados bajo **Cloudflare Access** con validación estricta de aserciones JWT (`cf-access-jwt-assertion`).
 
-Los borradores de términos, privacidad, retención, subencargados y respuesta a incidentes están en [`docs/legal/`](docs/legal/). Requieren revisión profesional antes de producción. El instalador interactivo registra la aceptación de términos; una instalación silenciosa deja la aceptación para el primer arranque. Los avisos de dependencias están en [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) y la política de vulnerabilidades en [`SECURITY.md`](SECURITY.md).
+Los documentos de términos, privacidad, retención, subencargados y respuesta a incidentes están en [`docs/legal/`](docs/legal/). El proveedor aprobó su publicación; términos y privacidad tienen versión `0.1.0`. El instalador interactivo registra la aceptación de términos; una instalación silenciosa deja la aceptación para el primer arranque. Los avisos de dependencias están en [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) y la política de vulnerabilidades en [`SECURITY.md`](SECURITY.md).
 
 ## Independencia, propiedad y autorización de sistemas
 
@@ -118,7 +118,9 @@ go test ./...       # Pruebas unitarias de launch y state
 
 ### Guía de configuración antes de producción
 
-Los datos del titular y los contactos operativos ya fueron incorporados en los borradores de [`docs/legal/`](docs/legal/). Los documentos siguen marcados como borradores hasta la revisión profesional. El valor operativo inicial de retención está documentado en [`docs/legal/retention-policy.md`](docs/legal/retention-policy.md); no debe presentarse como un plazo legal sin esa revisión.
+Los datos del titular y los contactos operativos están incorporados en los documentos aprobados por el proveedor en [`docs/legal/`](docs/legal/). Los campos todavía sin valor definido permanecen identificados como pendientes. La retención documentada en [`docs/legal/retention-policy.md`](docs/legal/retention-policy.md) es una política operativa, no un plazo legal automático.
+
+Para publicar esta versión legal, coordiná la actualización del Worker y del shell: `REQUIRED_TERMS_VERSION=0.1.0`, páginas legales sincronizadas y nuevo instalador. Una aceptación de `0.1.0-draft` no acredita la nueva versión. Los shells antiguos pueden no disponer del texto nuevo, por lo que no se debe exigir la nueva versión remotamente sin preparar su actualización. Cambiar archivos locales no actualiza por sí solo el Worker desplegado ni las variables externas.
 
 1. Para desarrollo local, copiá `worker/.dev.vars.example` como `worker/.dev.vars` y completá los valores de prueba. Ese archivo es local y no debe agregarse a Git.
 2. En el entorno de producción de Cloudflare Workers, configurá los valores no secretos como variables y `STATE_PRIVATE_KEY`, `TURNSTILE_SECRET` y `RESEND_API_KEY` como secretos. Configurá también Access, `REQUIRED_TERMS_VERSION`, `TERMS_URL` y `PRIVACY_URL` para ese mismo entorno.
