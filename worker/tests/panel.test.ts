@@ -72,4 +72,16 @@ describe("panel page", () => {
     expect(markup).toContain('id="equipment-expires"');
     expect(markup).toContain('id="administration"');
   });
+
+  it("renders a logout button in navigation pointing to access logout", async () => {
+    const page = await panelPage([], [], [], {
+      organizations: [],
+      groups: [],
+      managedUsers: [],
+    });
+    const markup = String(page);
+    expect(markup).toContain('id="logout-button"');
+    expect(markup).toContain('href="/cdn-cgi/access/logout"');
+    expect(markup).toContain("Cerrar sesión");
+  });
 });

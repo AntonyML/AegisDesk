@@ -367,5 +367,27 @@ describe("AegisDesk Worker integrated seams", () => {
     const panelHtml = await panel.text();
     expect(panelHtml).toContain("Panel de soporte");
     expect(panelHtml).toContain("Telemetría reciente");
+    expect(panelHtml).toContain('id="logout-button"');
+  });
+
+  it("serves the logout route and redirects appropriately", async () => {
+    const workerEnv = await testEnvironment();
+    const logoutRedirect = await jsonRequest("/logout", {}, workerEnv);
+    expect(logoutRedirect.status).toBe(302);
+    expect(logoutRedirect.headers.get("location")).toBe(
+      "/cdn-cgi/access/logout",
+    );
+
+    const accessLogout = await jsonRequest(
+      "/cdn-cgi/access/logout",
+      {},
+      workerEnv,
+    );
+    expect(accessLogout.status).toBe(200);
+    const logoutHtml = await accessLogout.text();
+    expect(logoutHtml).toContain("Sesión cerrada");
+    expect(accessLogout.headers.get("set-cookie")).toContain(
+      "CF_Authorization=;",
+    );
   });
 });

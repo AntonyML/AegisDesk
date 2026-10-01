@@ -52,6 +52,10 @@ query('#new-code')?.addEventListener('click', () => {
   enrollmentDialog?.showModal();
 });
 
+query('#logout-button')?.addEventListener('click', () => {
+  window.location.href = '/cdn-cgi/access/logout';
+});
+
 query('#enrollment-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;

@@ -53,9 +53,9 @@ button:disabled { cursor: wait; opacity: .65; }
 }
 .brand-name { font-weight: 800; letter-spacing: -.02em; }
 .brand-context { color: var(--muted); border-left: 1px solid var(--border); padding-left: 12px; }
-.app-nav { display: flex; align-items: center; gap: 4px; }
-.app-nav a { padding: 9px 12px; color: #344054; text-decoration: none; border-radius: 6px; font-size: 14px; }
-.app-nav a:hover { background: #f1f3f7; color: var(--text); }
+.app-nav { display: flex; align-items: center; gap: 8px; }
+.app-nav a:not(.button) { padding: 9px 12px; color: #344054; text-decoration: none; border-radius: 6px; font-size: 14px; }
+.app-nav a:not(.button):hover { background: #f1f3f7; color: var(--text); }
 
 .page { max-width: 1320px; margin: 0 auto; padding: 36px 32px 64px; }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
@@ -214,7 +214,7 @@ dialog::backdrop { background: rgba(10, 14, 28, .48); }
 @media (max-width: 700px) {
   .app-header { align-items: flex-start; flex-direction: column; gap: 10px; padding: 14px 18px; }
   .app-nav { width: 100%; overflow-x: auto; }
-  .app-nav a { padding-left: 8px; padding-right: 8px; white-space: nowrap; }
+  .app-nav a:not(.button) { padding-left: 8px; padding-right: 8px; white-space: nowrap; }
   .page { padding: 26px 18px 48px; }
   .page-heading, .section-heading { align-items: flex-start; flex-direction: column; }
   .kpi-grid { gap: 10px; }

@@ -152,6 +152,7 @@ export function panelPage(
           <a href="#tickets">Tickets</a>
           <a href="#administration">Administración</a>
           <button type="button" id="new-code" class="button primary">Generar código</button>
+          <a href="/cdn-cgi/access/logout" id="logout-button" class="button" role="button">Cerrar sesión</a>
         </nav>
       </header>
 
