@@ -23,6 +23,7 @@
     "REQUIRED_TERMS_VERSION": "0.1.0",
     "TERMS_URL": "https://aegisdesk.tonyml.com/legal/terms",
     "PRIVACY_URL": "https://aegisdesk.tonyml.com/legal/privacy",
+    "PLATFORM_OWNER_EMAILS": "antony.mongelopez@ucr.ac.cr,soporte@tonyml.com,soporte@femucaribe.go.cr",
     "CACHE_MAX_AGE_SECONDS": 259200,
     "OFFLINE_GRACE_SECONDS": 1209600
   },

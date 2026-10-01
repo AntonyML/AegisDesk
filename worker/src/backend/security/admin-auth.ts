@@ -29,12 +29,9 @@ export async function resolveAdminSession(
   const normalizedEmail = email.trim().toLowerCase();
 
   // 1. Check PLATFORM_OWNER_EMAILS
-  const ownerEnv =
-    env.PLATFORM_OWNER_EMAILS !== undefined
-      ? env.PLATFORM_OWNER_EMAILS
-      : (env.ENVIRONMENT as unknown as string) === "test"
-        ? "test-admin@test.com"
-        : "";
+  const isTest = (env.ENVIRONMENT as unknown as string) === "test";
+  const rawOwnerEnv = env.PLATFORM_OWNER_EMAILS ?? "";
+  const ownerEnv = isTest ? `${rawOwnerEnv},test-admin@test.com` : rawOwnerEnv;
   const ownerEmails = ownerEnv
     .split(",")
     .map((s) => s.trim().toLowerCase())
@@ -83,7 +80,7 @@ export async function resolveAdminSession(
     .all();
 
   if (memberships.length === 0) {
-    throw new AuthError("admin_access_denied", 403);
+    throw new AuthError("admin_access_denied", 403, { email: normalizedEmail });
   }
 
   // Pick highest role membership
@@ -99,7 +96,10 @@ export async function resolveAdminSession(
   };
 
   if (minRole && ROLE_RANK[session.role] < ROLE_RANK[minRole]) {
-    throw new AuthError("admin_forbidden", 403);
+    throw new AuthError("admin_forbidden", 403, {
+      email: normalizedEmail,
+      role: session.role,
+    });
   }
 
   return session;

@@ -390,4 +390,38 @@ describe("AegisDesk Worker integrated seams", () => {
       "CF_Authorization=;",
     );
   });
+
+  it("handles unauthenticated or unauthorized panel access with redirect or HTML page instead of raw JSON", async () => {
+    const workerEnv = await testEnvironment();
+
+    // 1. Without credentials and with ACCESS_TEAM_DOMAIN configured -> redirects to login
+    const envWithAccess = {
+      ...workerEnv,
+      ACCESS_TEAM_DOMAIN: "https://testteam.cloudflareaccess.com",
+      ACCESS_AUDIENCE: "test-aud",
+    } as unknown as Env;
+    const unauthRes = await jsonRequest("/panel", {}, envWithAccess);
+    expect(unauthRes.status).toBe(302);
+    expect(unauthRes.headers.get("location")).toBe(
+      "https://testteam.cloudflareaccess.com",
+    );
+
+    // 2. With authenticated email but not in memberships -> renders access denied HTML (403)
+    const deniedRes = await jsonRequest(
+      "/panel",
+      {
+        headers: {
+          "x-aegis-test-admin": "1",
+          "x-aegis-test-email": "random-user@test.com",
+        },
+      },
+      workerEnv,
+    );
+    expect(deniedRes.status).toBe(403);
+    const deniedHtml = await deniedRes.text();
+    expect(deniedHtml).toContain("Acceso denegado");
+    expect(deniedHtml).toContain("random-user@test.com");
+    expect(deniedHtml).toContain("/cdn-cgi/access/logout");
+    expect(deniedHtml).toContain("Cerrar sesión / Iniciar con otra cuenta");
+  });
 });
