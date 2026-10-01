@@ -30,6 +30,8 @@ export function registerErrorHandler(app: Hono<{ Bindings: Env }>): void {
       JSON.stringify({
         event: "request_error",
         path: new URL(c.req.url).pathname,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       }),
     );
     return jsonError("internal_error", 500);
