@@ -115,7 +115,7 @@ function accessDeniedPage(email?: string): string {
     <h1>Acceso denegado</h1>
     ${emailNotice}
     <div class="actions">
-      <a href="/cdn-cgi/access/logout" class="btn btn-primary">Cerrar sesión / Iniciar con otra cuenta</a>
+      <a href="/cdn-cgi/access/logout?returnTo=https%3A%2F%2Faegisdesk.tonyml.com%2Flogout" class="btn btn-primary">Cerrar sesión / Iniciar con otra cuenta</a>
       <a href="/tickets" class="btn btn-secondary">Ir a solicitudes de soporte</a>
     </div>
   </div>

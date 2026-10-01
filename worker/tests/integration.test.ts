@@ -370,25 +370,21 @@ describe("AegisDesk Worker integrated seams", () => {
     expect(panelHtml).toContain('id="logout-button"');
   });
 
-  it("serves the logout route and redirects appropriately", async () => {
+  it("serves the logout route and renders confirmation page", async () => {
     const workerEnv = await testEnvironment();
-    const logoutRedirect = await jsonRequest("/logout", {}, workerEnv);
-    expect(logoutRedirect.status).toBe(302);
-    expect(logoutRedirect.headers.get("location")).toBe(
-      "/cdn-cgi/access/logout",
-    );
+    const logoutRes = await jsonRequest("/logout", {}, workerEnv);
+    expect(logoutRes.status).toBe(200);
+    const logoutHtml = await logoutRes.text();
+    expect(logoutHtml).toContain("Sesión cerrada");
+    expect(logoutRes.headers.get("set-cookie")).toContain("CF_Authorization=;");
 
     const accessLogout = await jsonRequest(
-      "/cdn-cgi/access/logout",
+      "/cdn-cgi/access/logout?returnTo=/logout",
       {},
       workerEnv,
     );
-    expect(accessLogout.status).toBe(200);
-    const logoutHtml = await accessLogout.text();
-    expect(logoutHtml).toContain("Sesión cerrada");
-    expect(accessLogout.headers.get("set-cookie")).toContain(
-      "CF_Authorization=;",
-    );
+    expect(accessLogout.status).toBe(302);
+    expect(accessLogout.headers.get("location")).toBe("/logout");
   });
 
   it("handles unauthenticated or unauthorized panel access with redirect or HTML page instead of raw JSON", async () => {

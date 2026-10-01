@@ -81,7 +81,7 @@ describe("panel page", () => {
     });
     const markup = String(page);
     expect(markup).toContain('id="logout-button"');
-    expect(markup).toContain('href="/cdn-cgi/access/logout"');
+    expect(markup).toContain('href="/cdn-cgi/access/logout?returnTo=');
     expect(markup).toContain("Cerrar sesión");
   });
 });
